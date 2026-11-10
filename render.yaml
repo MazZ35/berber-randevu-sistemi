@@ -24,3 +24,11 @@ services:
         value: 30
       - key: CORS_ORIGIN
         sync: false
+      # Web Push bildirimleri — bunlar yoksa bildirimler sessizce kapalı kalır.
+      # Üretmek için: npx web-push generate-vapid-keys
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        value: mailto:info@ozdedehairstudio.com

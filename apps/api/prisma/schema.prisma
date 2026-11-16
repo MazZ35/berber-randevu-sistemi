@@ -139,6 +139,11 @@ model Barber {
   /// panele girer, bildirim alır; ama sitede, botta ve takvim sekmelerinde yoktur.
   takesAppointments Boolean @default(true) @map("takes_appointments")
 
+  /// Gizli hesap: diğer yöneticilerin berber listesinde görünmez, onlar
+  /// tarafından düzenlenemez ya da silinemez. Panelden açılıp kapatılamaz;
+  /// yalnızca veritabanından atanır.
+  isHidden Boolean @default(false) @map("is_hidden")
+
   /// Hesap kilitleme sunucu tarafında tutulur; istemci sayacı güvenilir değildir.
   failedLoginCount Int       @default(0) @map("failed_login_count")
   lockedUntil      DateTime? @map("locked_until") @db.Timestamptz(3)

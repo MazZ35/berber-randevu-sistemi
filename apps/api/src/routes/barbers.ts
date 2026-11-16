@@ -58,7 +58,7 @@ barbersRouter.get(
   '/all',
   requireAdmin,
   asyncHandler(async (req, res) => {
-    const barbers = await listAllBarbers(req.auth!.shopId);
+    const barbers = await listAllBarbers(req.auth!.shopId, req.auth!);
     res.json({ barbers });
   }),
 );

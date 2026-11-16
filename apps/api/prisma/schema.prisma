@@ -135,6 +135,10 @@ model Barber {
   /// Berber silinmez, pasife alınır — randevu geçmişi korunur.
   isActive Boolean @default(true) @map("is_active")
 
+  /// Müşteriye berber olarak görünür mü? Kapalıysa yalnızca yönetici hesabıdır:
+  /// panele girer, bildirim alır; ama sitede, botta ve takvim sekmelerinde yoktur.
+  takesAppointments Boolean @default(true) @map("takes_appointments")
+
   /// Hesap kilitleme sunucu tarafında tutulur; istemci sayacı güvenilir değildir.
   failedLoginCount Int       @default(0) @map("failed_login_count")
   lockedUntil      DateTime? @map("locked_until") @db.Timestamptz(3)

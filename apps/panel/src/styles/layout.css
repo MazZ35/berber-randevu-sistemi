@@ -1408,3 +1408,34 @@ svg {
 .barber-row .service-confirm {
   grid-column: 1 / -1;
 }
+
+/* ── Onay kutusu alanı ("Randevu alır") ───────────────── */
+.field-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.field-checkbox input {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: var(--accent);
+  flex: none;
+}
+
+.field-checkbox .field-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+/* Berber satırında kutu kendi satırında dursun; ızgarayı bozmasın. */
+.barber-row .barber-row-takes {
+  grid-column: 1 / -1;
+  order: 10;
+}

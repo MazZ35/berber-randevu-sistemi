@@ -249,7 +249,7 @@ async function buildPublicShopInfo() {
       orderBy: { sortOrder: 'asc' },
     }),
     prisma.barber.findMany({
-      where: { shopId: shop.id, isActive: true },
+      where: { shopId: shop.id, isActive: true, takesAppointments: true },
       select: {
         id: true,
         name: true,

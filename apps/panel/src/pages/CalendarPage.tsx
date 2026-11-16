@@ -57,7 +57,9 @@ export default function CalendarPage() {
       if (barber?.id) setSelectedBarberId(barber.id);
       return;
     }
-    if (!selectedBarberId && barbers.length > 0) {
+    // Seçili kimlik listede yoksa (randevu almayan yönetici hesabı kendi
+    // takvimine sahip değil) ilk berbere düşülür; yoksa boş takvim görünürdü.
+    if (barbers.length > 0 && !barbers.some((b) => b.id === selectedBarberId)) {
       setSelectedBarberId(barbers[0]!.id);
     }
   }, [isAdmin, barber?.id, barbers, selectedBarberId]);

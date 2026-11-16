@@ -338,6 +338,8 @@ export const createBarberSchema = z.object({
     .min(10, 'Şifre en az 10 karakter olmalı')
     .max(200, 'Şifre çok uzun'),
   role: z.nativeEnum(BARBER_ROLE).default(BARBER_ROLE.STAFF),
+  /** false → yalnızca yönetici hesabı; müşteriye berber olarak görünmez. */
+  takesAppointments: z.boolean().default(true),
 });
 export type CreateBarberInput = z.infer<typeof createBarberSchema>;
 
@@ -357,6 +359,7 @@ export const updateBarberSchema = z.object({
   name: z.string().trim().min(1, 'Ad gerekli').max(120),
   role: z.nativeEnum(BARBER_ROLE),
   isActive: z.boolean(),
+  takesAppointments: z.boolean().default(true),
 });
 export type UpdateBarberInput = z.infer<typeof updateBarberSchema>;
 

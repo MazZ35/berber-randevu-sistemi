@@ -400,7 +400,7 @@ async function askBarber(args: DispatchArgs): Promise<void> {
   const { shop, customer, sessionId, context } = args;
 
   const barbers = await prisma.barber.findMany({
-    where: { shopId: shop.id, isActive: true },
+    where: { shopId: shop.id, isActive: true, takesAppointments: true },
     orderBy: { name: 'asc' },
   });
 
@@ -439,7 +439,7 @@ async function handleSelectBarber(args: DispatchArgs): Promise<void> {
   } else {
     // Metin yazdıysa isimle eşleştirmeyi dene
     const barbers = await prisma.barber.findMany({
-      where: { shopId: shop.id, isActive: true },
+      where: { shopId: shop.id, isActive: true, takesAppointments: true },
     });
     const normalized = normalizeTurkish(text);
     const match = barbers.find((b) => normalizeTurkish(b.name).includes(normalized));
@@ -449,7 +449,7 @@ async function handleSelectBarber(args: DispatchArgs): Promise<void> {
   if (!barberId) return handleUnknown(args, () => askBarber(args));
 
   const barber = await prisma.barber.findFirst({
-    where: { id: barberId, shopId: shop.id, isActive: true },
+    where: { id: barberId, shopId: shop.id, isActive: true, takesAppointments: true },
   });
   if (!barber) return handleUnknown(args, () => askBarber(args));
 

@@ -28,12 +28,19 @@ export function AddBarberForm() {
   const [password, setPassword] = useState('');
   const [passwordAgain, setPasswordAgain] = useState('');
   const [role, setRole] = useState<BarberRole>('staff');
+  const [randevuAlir, setRandevuAlir] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [eklenen, setEklenen] = useState<{ name: string; email: string } | null>(null);
 
   const mutation = useMutation({
     mutationFn: () =>
-      createBarber({ name: name.trim(), email: email.trim(), password, role }),
+      createBarber({
+        name: name.trim(),
+        email: email.trim(),
+        password,
+        role,
+        takesAppointments: role === 'admin' ? randevuAlir : true,
+      }),
     onSuccess: (data) => {
       setEklenen({ name: data.barber.name, email: data.barber.email });
       setName('');
@@ -41,6 +48,7 @@ export function AddBarberForm() {
       setPassword('');
       setPasswordAgain('');
       setRole('staff');
+      setRandevuAlir(true);
       void queryClient.invalidateQueries({ queryKey: ['barbers'] });
     },
     onError: (err) => setError(err instanceof ApiError ? err.message : 'Berber eklenemedi'),
@@ -152,6 +160,23 @@ export function AddBarberForm() {
           <option value="admin">Yönetici</option>
         </select>
       </label>
+
+      {role === 'admin' && (
+        <label className="field-checkbox">
+          <input
+            type="checkbox"
+            checked={randevuAlir}
+            onChange={(e) => setRandevuAlir(e.target.checked)}
+          />
+          <span>
+            Randevu alır
+            <span className="field-hint">
+              Kapalıysa yalnızca yönetici hesabıdır: panele girer ve bildirim alır,
+              ama sitede ve takvimde berber olarak görünmez.
+            </span>
+          </span>
+        </label>
+      )}
 
       {error && (
         <div className="form-error" role="alert">

@@ -21,15 +21,31 @@ import { logger } from '../lib/logger.js';
  * bildirim gönderilememesi randevu alınmasını ENGELLEMEMELİ.
  */
 
-const publicKey = process.env.VAPID_PUBLIC_KEY;
-const privateKey = process.env.VAPID_PRIVATE_KEY;
-const subject = process.env.VAPID_SUBJECT ?? 'mailto:info@ozdedehairstudio.com';
+// Panelden kopyalanırken araya karışan boşluk/satır sonu yaygın; temizleniyor.
+const publicKey = process.env.VAPID_PUBLIC_KEY?.trim() || undefined;
+const privateKey = process.env.VAPID_PRIVATE_KEY?.trim() || undefined;
+const subject = process.env.VAPID_SUBJECT?.trim() || 'mailto:info@ozdedehairstudio.com';
 
-export const isPushConfigured = Boolean(publicKey && privateKey);
-
-if (isPushConfigured) {
-  webpush.setVapidDetails(subject, publicKey!, privateKey!);
+/**
+ * ⚠️ `setVapidDetails` hatalı anahtarda HATA FIRLATIYOR. Modül seviyesinde
+ * yakalanmazsa sunucu hiç açılamaz — bildirim ayarındaki bir yazım hatası
+ * tüm randevu sistemini düşürürdü. Hata loglanır, bildirimler kapalı kalır.
+ */
+function configure(): boolean {
+  if (!publicKey || !privateKey) return false;
+  try {
+    webpush.setVapidDetails(subject, publicKey, privateKey);
+    return true;
+  } catch (error) {
+    logger.error(
+      { err: error },
+      'VAPID anahtarları geçersiz — bildirimler devre dışı. VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT değerlerini kontrol edin.',
+    );
+    return false;
+  }
 }
+
+export const isPushConfigured = configure();
 
 /** Panel, aboneliği kurarken bu anahtara ihtiyaç duyuyor. */
 export function getPublicKey(): string | null {

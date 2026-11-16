@@ -139,7 +139,9 @@ async function loadSlotContext(
     where: { id: barberId, shopId },
   });
   if (!barber) throw new NotFoundError('Berber bulunamadı');
-  if (!barber.isActive) throw new ValidationError('Bu berber şu anda randevu almıyor');
+  if (!barber.isActive || !barber.takesAppointments) {
+    throw new ValidationError('Bu berber şu anda randevu almıyor');
+  }
 
   const { start: dayStart, end: dayEnd } = localDayBounds(date, shop.timezone);
   const dayOfWeek = getZonedParts(dayStart, shop.timezone).dayOfWeek;

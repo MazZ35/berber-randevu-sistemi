@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     region: frankfurt
-    buildCommand: npm install --include=dev && npx prisma generate --schema=apps/api/prisma/schema.prisma && npm run build --workspace=@berber/shared && npm run build --workspace=@berber/api
+    buildCommand: npm install --include=dev && npx prisma generate --schema=apps/api/prisma/schema.prisma && npx prisma migrate deploy --schema=apps/api/prisma/schema.prisma && npm run build --workspace=@berber/shared && npm run build --workspace=@berber/api
     startCommand: npm run start --workspace=@berber/api
     healthCheckPath: /healthz
     envVars:
@@ -24,3 +24,11 @@ services:
         value: 30
       - key: CORS_ORIGIN
         sync: false
+      # Web Push bildirimleri — bunlar yoksa bildirimler sessizce kapalı kalır.
+      # Üretmek için: npx web-push generate-vapid-keys
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        value: mailto:info@ozdedehairstudio.com

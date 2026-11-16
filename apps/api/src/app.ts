@@ -25,13 +25,25 @@ export function createApp(): Express {
   const app = express();
 
   /**
-   * ⚠️ Caddy/nginx arkasında çalışıyoruz. Bu ayar olmadan Express her isteğin
-   * IP'sini proxy'nin IP'si olarak görür; rate limiter da tüm trafiği tek
-   * istemci sanıp ya herkesi engeller ya da hiç kimseyi sınırlamaz.
+   * ⚠️ İstek zinciri: müşteri → Vercel (site/panel `/api` yönlendirmesi) →
+   * Render'ın önündeki proxy'ler → bu sunucu.
    *
-   * Değer 1 = "önümde tam olarak bir proxy var".
+   * Eskiden `1` idi ("önümde tek proxy var"). Vercel yönlendirmesi eklenince
+   * `req.ip` müşterinin değil VERCEL'İN adresi oldu: tüm müşteriler tek cihaz
+   * sanıldı, "bu cihazdan çok sayıda farklı numaraya randevu" kuralı günün
+   * üçüncü müşterisinden sonra herkesi engelledi; hız sınırları da herkese
+   * ortak işledi.
+   *
+   * Vercel `X-Forwarded-For` başlığını gerçek müşteri adresiyle YENİDEN yazıyor
+   * (müşterinin gönderdiğini taşımıyor), bu yüzden zincirin en solundaki adres
+   * müşteridir. Fonksiyon biçimi, aradaki proxy sayısına (Render tarafı
+   * değişebilir) bağımlı kalmamak için.
+   *
+   * Sınır: Vercel'i atlayıp doğrudan onrender.com adresine istek atan biri bu
+   * başlığı kendisi yazabilir. Diğer korumalar (numara başına sınırlar, kara
+   * liste, 7 günlük pencere) o durumda da geçerli.
    */
-  app.set('trust proxy', 1);
+  app.set('trust proxy', () => true);
   app.disable('x-powered-by');
 
   // ── Güvenlik başlıkları ────────────────────────────────

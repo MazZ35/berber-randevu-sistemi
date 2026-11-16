@@ -3,7 +3,7 @@ import { Trash2 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchTimeOff, createTimeOff, deleteTimeOff } from '../lib/endpoints';
 import { ApiError } from '../lib/api';
-import { formatDateTr, localDayRangeIso, todayLocalDate } from '../lib/dates';
+import { formatDateTr, isoToLocalDate, localDayRangeIso, todayLocalDate } from '../lib/dates';
 
 interface Props {
   barberId: string;
@@ -96,7 +96,8 @@ export function TimeOffManager({ barberId }: Props) {
         {timeOff.map((t) => (
           <div className="time-off-item" key={t.id}>
             <div className="time-off-item-info">
-              <div className="time-off-item-date">{formatDateTr(t.startsAt.slice(0, 10))}</div>
+              <div className="time-off-item-date">{/* UTC'den kesilirse Türkiye gece yarısı bir önceki güne düşüyordu. */}
+                {formatDateTr(isoToLocalDate(t.startsAt))}</div>
               <div className="time-off-item-reason">{t.reason}</div>
             </div>
             <button

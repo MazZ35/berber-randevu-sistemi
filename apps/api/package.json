@@ -17,7 +17,8 @@
     "db:seed": "tsx --env-file=.env prisma/seed.ts",
     "db:studio": "prisma studio",
     "whatsapp:templates": "tsx src/scripts/print-templates.ts",
-    "reset-password": "tsx --env-file=.env src/scripts/reset-password.ts"
+    "reset-password": "tsx --env-file=.env src/scripts/reset-password.ts",
+    "create-admin": "tsx src/scripts/create-admin.ts"
   },
   "prisma": {
     "seed": "tsx --env-file=.env prisma/seed.ts"

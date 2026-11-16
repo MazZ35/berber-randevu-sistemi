@@ -131,6 +131,7 @@ export async function createBarber(
   email: string,
   password: string,
   role: 'admin' | 'staff',
+  takesAppointments = true,
 ): Promise<CreateBarberResult> {
   const existing = await prisma.barber.findUnique({
     where: { shopId_email: { shopId, email } },
@@ -140,7 +141,16 @@ export async function createBarber(
   const passwordHash = await hashPassword(password, ARGON2_OPTIONS);
 
   const barber = await prisma.barber.create({
-    data: { shopId, name, email, role, passwordHash },
+    // Randevu almama yalnızca yöneticiye özgü: çalışan panelde yalnızca
+    // kendi takvimini görür, randevu almıyorsa panelin işe yarar yeri kalmaz.
+    data: {
+      shopId,
+      name,
+      email,
+      role,
+      passwordHash,
+      takesAppointments: role === 'admin' ? takesAppointments : true,
+    },
   });
 
   // Varsayılan çalışma programı: Pazar kapalı, diğer günler 09:00-20:15 —
@@ -198,7 +208,7 @@ export async function createBarber(
 export async function updateBarber(
   shopId: string,
   barberId: string,
-  input: { name: string; role: 'admin' | 'staff'; isActive: boolean },
+  input: { name: string; role: 'admin' | 'staff'; isActive: boolean; takesAppointments: boolean },
   auth: AuthContext,
 ) {
   const barber = await prisma.barber.findFirst({ where: { id: barberId, shopId } });
@@ -223,7 +233,14 @@ export async function updateBarber(
     throw new ValidationError('Kendi hesabınızı kapatamazsınız.');
   }
 
-  if (barber.isActive && !input.isActive) {
+  const takesAppointments = input.role === 'admin' ? input.takesAppointments : true;
+
+  // Randevu almayı bırakan berber de takvimden kayboluyor; gelecek
+  // randevuları için pasife almadaki korumanın aynısı geçerli.
+  const gorunmezOluyor =
+    (barber.isActive && !input.isActive) || (barber.takesAppointments && !takesAppointments);
+
+  if (gorunmezOluyor) {
     const gelecekRandevu = await prisma.appointment.count({
       where: {
         barberId,
@@ -235,7 +252,7 @@ export async function updateBarber(
     if (gelecekRandevu > 0) {
       throw new ValidationError(
         `${barber.name} için ${gelecekRandevu} adet gelecek randevu var. ` +
-          'Berberi kapatmadan önce bu randevuları iptal edin ya da başka bir ' +
+          'Önce bu randevuları iptal edin ya da başka bir ' +
           'berbere taşıyın — aksi halde panelde görünmez hale gelirler.',
       );
     }
@@ -243,8 +260,15 @@ export async function updateBarber(
 
   const guncel = await prisma.barber.update({
     where: { id: barberId },
-    data: { name: input.name, role: input.role, isActive: input.isActive },
-    select: { id: true, name: true, email: true, role: true, isActive: true },
+    data: { name: input.name, role: input.role, isActive: input.isActive, takesAppointments },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      isActive: true,
+      takesAppointments: true,
+    },
   });
 
   return guncel;
@@ -276,6 +300,7 @@ export async function listAllBarbers(shopId: string) {
         email: true,
         role: true,
         isActive: true,
+        takesAppointments: true,
         _count: { select: { appointments: true } },
       },
       orderBy: [{ isActive: 'desc' }, { name: 'asc' }],

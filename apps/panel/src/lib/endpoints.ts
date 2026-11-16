@@ -171,6 +171,7 @@ export function createBarber(input: {
   email: string;
   password: string;
   role: BarberRole;
+  takesAppointments: boolean;
 }) {
   return apiRequest<{ barber: Barber & { email: string } }>('/barbers', {
     method: 'POST',
@@ -201,7 +202,7 @@ export function deleteBarber(id: string) {
 /** Berberin adını, rolünü ve aktifliğini günceller (yalnızca admin). */
 export function updateBarber(
   id: string,
-  input: { name: string; role: BarberRole; isActive: boolean },
+  input: { name: string; role: BarberRole; isActive: boolean; takesAppointments: boolean },
 ) {
   return apiRequest<{ barber: BarberAdmin }>(`/barbers/${id}`, { method: 'PUT', body: input });
 }

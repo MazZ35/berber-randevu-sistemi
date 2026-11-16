@@ -37,7 +37,8 @@ barbersRouter.get(
   '/',
   asyncHandler(async (req, res) => {
     const barbers = await prisma.barber.findMany({
-      where: { shopId: req.auth!.shopId, isActive: true },
+      // Randevu almayan yönetici hesapları takvimde sekme açmamalı.
+      where: { shopId: req.auth!.shopId, isActive: true, takesAppointments: true },
       select: { id: true, name: true, role: true },
       orderBy: { name: 'asc' },
     });
@@ -106,6 +107,7 @@ barbersRouter.post(
       input.email,
       input.password,
       input.role,
+      input.takesAppointments,
     );
 
     // Yeni berber sitedeki berber listesine girmeli (bkz. public-booking.ts).

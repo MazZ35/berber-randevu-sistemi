@@ -29,6 +29,8 @@ export interface BarberAdmin {
   email: string;
   role: BarberRole;
   isActive: boolean;
+  /** false → yalnızca yönetici; sitede ve takvim sekmelerinde görünmez. */
+  takesAppointments: boolean;
   /**
    * Bu berbere ait TOPLAM randevu sayısı.
    *

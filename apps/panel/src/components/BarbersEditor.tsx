@@ -25,6 +25,7 @@ import type { BarberAdmin, BarberRole } from '../lib/types';
 interface BarberDraft {
   name: string;
   role: BarberRole;
+  takesAppointments: boolean;
 }
 
 export function BarbersEditor() {
@@ -42,7 +43,7 @@ export function BarbersEditor() {
   const barbers = query.data?.barbers ?? [];
 
   function draftFor(b: BarberAdmin): BarberDraft {
-    return drafts[b.id] ?? { name: b.name, role: b.role };
+    return drafts[b.id] ?? { name: b.name, role: b.role, takesAppointments: b.takesAppointments };
   }
 
   function setDraft(b: BarberAdmin, patch: Partial<BarberDraft>) {
@@ -57,6 +58,7 @@ export function BarbersEditor() {
         name: draft.name.trim(),
         role: draft.role,
         isActive: input.isActive,
+        takesAppointments: draft.role === 'admin' ? draft.takesAppointments : true,
       });
     },
     onSuccess: (_veri, input) => {
@@ -112,6 +114,9 @@ export function BarbersEditor() {
             <div className="barber-row-head">
               <span className="barber-row-email">{b.email}</span>
               {!b.isActive && <span className="barber-row-badge">Kapalı</span>}
+              {b.isActive && !b.takesAppointments && (
+                <span className="barber-row-badge">Sadece yönetici</span>
+              )}
               {kendisi && <span className="barber-row-badge kendisi">Siz</span>}
             </div>
 
@@ -135,6 +140,17 @@ export function BarbersEditor() {
                 <option value="admin">Yönetici</option>
               </select>
             </label>
+
+            {draft.role === 'admin' && (
+              <label className="field-checkbox barber-row-takes">
+                <input
+                  type="checkbox"
+                  checked={draft.takesAppointments}
+                  onChange={(e) => setDraft(b, { takesAppointments: e.target.checked })}
+                />
+                <span>Randevu alır</span>
+              </label>
+            )}
 
             <button
               type="button"

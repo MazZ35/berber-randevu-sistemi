@@ -16,26 +16,27 @@ import { recordAudit, AUDIT_ACTIONS } from './audit.js';
 
 const ARGON2_OPTIONS = { memoryCost: 19_456, timeCost: 2, parallelism: 1 } as const;
 
-/** İsteği yapan kişi gizli (üst) hesap mı? */
-async function isHiddenViewer(auth: AuthContext): Promise<boolean> {
+/** İsteği yapan kişi süper yönetici mi? */
+async function isSuperAdminViewer(auth: AuthContext): Promise<boolean> {
   const viewer = await prisma.barber.findUnique({
     where: { id: auth.barberId },
-    select: { isHidden: true },
+    select: { isSuperAdmin: true },
   });
-  return viewer?.isHidden ?? false;
+  return viewer?.isSuperAdmin ?? false;
 }
 
 /**
- * Gizli hesap, başka biri tarafından değiştirilemez ya da silinemez.
- * "Yok" gibi davranılıyor (403 değil 404): varlığı bile belli olmamalı.
+ * Süper yöneticiyi yalnızca süper yönetici (ya da kendisi) değiştirebilir.
+ * Aksi halde sıradan bir yönetici onun yetkisini alıp dükkanın sahibini
+ * panelden düşürebilirdi.
  */
-async function assertNotHiddenFrom(
-  barber: { id: string; isHidden: boolean },
+async function assertCanManage(
+  barber: { id: string; isSuperAdmin: boolean },
   auth: AuthContext,
 ): Promise<void> {
-  if (!barber.isHidden || barber.id === auth.barberId) return;
-  if (await isHiddenViewer(auth)) return;
-  throw new NotFoundError('Berber bulunamadı');
+  if (!barber.isSuperAdmin || barber.id === auth.barberId) return;
+  if (await isSuperAdminViewer(auth)) return;
+  throw new ForbiddenError('Süper yöneticiyi yalnızca süper yönetici değiştirebilir.');
 }
 
 // ─── Çalışma saatleri ───────────────────────────────────
@@ -235,7 +236,11 @@ export async function updateBarber(
 ) {
   const barber = await prisma.barber.findFirst({ where: { id: barberId, shopId } });
   if (!barber) throw new NotFoundError('Berber bulunamadı');
-  await assertNotHiddenFrom(barber, auth);
+  await assertCanManage(barber, auth);
+
+  if (barber.isSuperAdmin && (input.role !== 'admin' || !input.isActive)) {
+    throw new ValidationError('Süper yöneticinin yetkisi panelden alınamaz ya da hesabı kapatılamaz.');
+  }
 
   const yetkisiKalkiyor = barber.role === 'admin' && (input.role !== 'admin' || !input.isActive);
 
@@ -314,14 +319,9 @@ export async function listAllBarbers(shopId: string, auth: AuthContext) {
    *
    * Sayımlar tek sorguda toplanıyor, berber başına ayrı sorgu atılmıyor.
    */
-  // Gizli hesaplar yalnızca başka bir gizli hesaba (ya da kendine) görünür.
-  const gizliyiGorebilir = await isHiddenViewer(auth);
-
   const [barbers, gelecekSayimlari] = await Promise.all([
     prisma.barber.findMany({
-      where: gizliyiGorebilir
-        ? { shopId }
-        : { shopId, OR: [{ isHidden: false }, { id: auth.barberId }] },
+      where: { shopId },
       select: {
         id: true,
         name: true,
@@ -329,6 +329,7 @@ export async function listAllBarbers(shopId: string, auth: AuthContext) {
         role: true,
         isActive: true,
         takesAppointments: true,
+        isSuperAdmin: true,
         _count: { select: { appointments: true } },
       },
       orderBy: [{ isActive: 'desc' }, { name: 'asc' }],
@@ -390,7 +391,7 @@ export async function deleteBarber(
 ): Promise<{ appointmentCount: number }> {
   const barber = await prisma.barber.findFirst({ where: { id: barberId, shopId } });
   if (!barber) throw new NotFoundError('Berber bulunamadı');
-  await assertNotHiddenFrom(barber, auth);
+  await assertCanManage(barber, auth);
 
   if (barberId === auth.barberId) {
     throw new ValidationError('Kendi hesabınızı silemezsiniz.');

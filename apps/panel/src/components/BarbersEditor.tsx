@@ -41,6 +41,7 @@ export function BarbersEditor() {
 
   const query = useQuery({ queryKey: ['barbers', 'all'], queryFn: fetchAllBarbers });
   const barbers = query.data?.barbers ?? [];
+  const benSuperim = barbers.some((b) => b.id === oturumdaki?.id && b.isSuperAdmin);
 
   function draftFor(b: BarberAdmin): BarberDraft {
     return drafts[b.id] ?? { name: b.name, role: b.role, takesAppointments: b.takesAppointments };
@@ -108,6 +109,8 @@ export function BarbersEditor() {
       {barbers.map((b) => {
         const draft = draftFor(b);
         const kendisi = b.id === oturumdaki?.id;
+        // Süper yöneticinin satırı, süper olmayanlar için salt okunur.
+        const kilitli = b.isSuperAdmin && !benSuperim && !kendisi;
 
         return (
           <div className={`barber-row${b.isActive ? '' : ' pasif'}`} key={b.id}>
@@ -117,6 +120,7 @@ export function BarbersEditor() {
               {b.isActive && !b.takesAppointments && (
                 <span className="barber-row-badge">Sadece yönetici</span>
               )}
+              {b.isSuperAdmin && <span className="barber-row-badge kendisi">Süper yönetici</span>}
               {kendisi && <span className="barber-row-badge kendisi">Siz</span>}
             </div>
 
@@ -126,6 +130,7 @@ export function BarbersEditor() {
                 type="text"
                 value={draft.name}
                 maxLength={120}
+                disabled={kilitli}
                 onChange={(e) => setDraft(b, { name: e.target.value })}
               />
             </label>
@@ -134,6 +139,7 @@ export function BarbersEditor() {
               <span>Yetki</span>
               <select
                 value={draft.role}
+                disabled={kilitli || b.isSuperAdmin}
                 onChange={(e) => setDraft(b, { role: e.target.value as BarberRole })}
               >
                 <option value="staff">Berber</option>
@@ -146,6 +152,7 @@ export function BarbersEditor() {
                 <input
                   type="checkbox"
                   checked={draft.takesAppointments}
+                  disabled={kilitli}
                   onChange={(e) => setDraft(b, { takesAppointments: e.target.checked })}
                 />
                 <span>Randevu alır</span>
@@ -159,7 +166,7 @@ export function BarbersEditor() {
                 setError(null);
                 mutation.mutate({ barber: b, isActive: b.isActive });
               }}
-              disabled={mutation.isPending}
+              disabled={mutation.isPending || kilitli}
             >
               {savedId === b.id ? <Check size={16} aria-hidden /> : 'Kaydet'}
             </button>
@@ -174,7 +181,7 @@ export function BarbersEditor() {
               className="btn-icon barber-row-toggle"
               aria-label={b.isActive ? `${b.name} hesabını kapat` : `${b.name} hesabını aç`}
               title={b.isActive ? 'Hesabı kapat' : 'Hesabı aç'}
-              disabled={mutation.isPending}
+              disabled={mutation.isPending || b.isSuperAdmin}
               onClick={() => {
                 setError(null);
                 if (b.isActive) {
@@ -192,7 +199,7 @@ export function BarbersEditor() {
               className="btn-icon service-row-delete"
               aria-label={`${b.name} kaydını kalıcı olarak sil`}
               title="Kalıcı olarak sil"
-              disabled={silMutation.isPending}
+              disabled={silMutation.isPending || b.isSuperAdmin}
               onClick={() => {
                 setError(null);
                 setKapatilacak(null);

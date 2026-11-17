@@ -31,6 +31,8 @@ export interface BarberAdmin {
   isActive: boolean;
   /** false → yalnızca yönetici; sitede ve takvim sekmelerinde görünmez. */
   takesAppointments: boolean;
+  /** Süper yönetici: yalnızca başka bir süper yönetici düzenleyebilir. */
+  isSuperAdmin: boolean;
   /**
    * Bu berbere ait TOPLAM randevu sayısı.
    *

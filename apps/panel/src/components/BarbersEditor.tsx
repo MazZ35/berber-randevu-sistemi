@@ -137,14 +137,22 @@ export function BarbersEditor() {
 
             <label className="service-row-field">
               <span>Yetki</span>
-              <select
-                value={draft.role}
-                disabled={kilitli || b.isSuperAdmin}
-                onChange={(e) => setDraft(b, { role: e.target.value as BarberRole })}
-              >
-                <option value="staff">Berber</option>
-                <option value="admin">Yönetici</option>
-              </select>
+              {/* Süper yönetici veritabanında `role: admin` + işaret; burada
+                  kendi adıyla görünsün, seçilebilir bir değer değil. */}
+              {b.isSuperAdmin ? (
+                <select value="super" disabled>
+                  <option value="super">Süper yönetici</option>
+                </select>
+              ) : (
+                <select
+                  value={draft.role}
+                  disabled={kilitli}
+                  onChange={(e) => setDraft(b, { role: e.target.value as BarberRole })}
+                >
+                  <option value="staff">Berber</option>
+                  <option value="admin">Yönetici</option>
+                </select>
+              )}
             </label>
 
             {draft.role === 'admin' && (

@@ -8,6 +8,7 @@ Kullanim:  py tara.py tespih "kehribar tespih" "oltu tespih"
 import functools
 import json
 import random
+import re
 import sys
 import time
 from pathlib import Path
@@ -232,13 +233,50 @@ def main(terms, links=()):
             url = f"https://www.instagram.com/{u}/"
             print(f"[profil] {url}")
             try:
-                page.goto(url, wait_until="domcontentloaded")
-                bekle()
-                p = seen.get(u, {})
-                if "biography" not in p:  # JSON'da yoksa sayfadan oku
-                    desc = page.eval_on_selector("meta[name='description']", "e => e.content") or ""
-                    body = page.inner_text("header") if page.query_selector("header") else ""
-                    p = {**p, "biography": body or desc}
+                local = capture(lambda: (page.goto(url, wait_until="domcontentloaded"), bekle()))
+                p = dict(seen.get(u, {}))
+                if len(local.get(u, {})) > len(p):
+                    p = dict(local[u])
+                # bio'daki "devamı / more" yazisina tikla
+                for t in ("devamı", "more", "daha fazla"):
+                    try:
+                        loc = page.locator("header").get_by_text(t, exact=True)
+                        if loc.count():
+                            loc.first.click(timeout=2000); bekle(1, 2); break
+                    except Exception:
+                        pass
+                header = page.inner_text("header") if page.query_selector("header") else ""
+                linkler = []
+
+                def topla_linkler(scope):
+                    for h in page.eval_on_selector_all(scope + " a[href]", "els => els.map(e => e.href)"):
+                        if "l.instagram.com" in h and "u=" in h:
+                            from urllib.parse import parse_qs, urlparse, unquote
+                            h = unquote(parse_qs(urlparse(h).query).get("u", [h])[0])
+                        if "instagram.com" not in h and h not in linkler:
+                            linkler.append(h)
+
+                topla_linkler("header")
+                # "ve 1 diger / and 1 more" -> Baglantilar penceresi
+                try:
+                    btn = page.locator("header").get_by_text(re.compile(r"(ve \d+ diğer|and \d+ more)"))
+                    if btn.count():
+                        btn.first.click(timeout=3000); bekle(1, 2)
+                        dlg = "div[role='dialog']"
+                        if page.query_selector(dlg):
+                            topla_linkler(dlg)
+                            header += "\n" + page.inner_text(dlg)
+                            page.keyboard.press("Escape")
+                except Exception as e:
+                    print(f"   baglantilar acilamadi: {str(e)[:80]}")
+                for bl in p.get("bio_links") or []:
+                    if isinstance(bl, dict) and bl.get("url") and bl["url"] not in linkler:
+                        linkler.append(bl["url"])
+                bio = p.get("biography") or ""
+                p["biography"] = (bio + "\n" + header).strip() if header not in bio else bio
+                if linkler:
+                    p["external_url"] = " ".join(linkler)
+                    print(f"   linkler: {linkler}")
                 rec = to_record(p, u)
                 old.append(rec)
                 OUT.write_text(json.dumps(old, ensure_ascii=False, indent=1), "utf-8")

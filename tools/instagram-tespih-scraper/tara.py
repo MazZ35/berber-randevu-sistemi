@@ -18,7 +18,7 @@ print = functools.partial(print, flush=True)
 
 from playwright.sync_api import sync_playwright
 
-LIMIT = 20            # kelime basina max profil
+LIMIT = 100           # kelime basina hedef profil sayisi (--limit=N ile degisir)
 SCROLL = 4            # arama sayfasinda kac kez asagi kaydirilsin
 OUT = Path("kuyruk.json")
 SKIP = {"instagram", "explore", "accounts", "p", "reel", "reels", "stories", "direct"}
@@ -65,6 +65,9 @@ def to_record(p: dict, u: str) -> dict:
 
 
 def main(terms, links=()):
+    # uzun kelimeler once: "kehribar tespih" "tespih"ten once taranir
+    terms = sorted(dict.fromkeys(terms), key=len, reverse=True)
+    print(f"Kelime sirasi: {terms}  |  kelime basina hedef: {LIMIT} profil")
     seen: dict = {}
 
     def on_response(resp):
@@ -110,7 +113,7 @@ def main(terms, links=()):
         def ekle(us, kaynak):
             n = 0
             for u in us:
-                if u and u not in found and u not in bad and n < LIMIT * 3:
+                if u and u not in found and u not in bad:
                     found.append(u); n += 1
                     print(f"   + https://www.instagram.com/{u}/   ({kaynak})")
             return n
@@ -140,10 +143,17 @@ def main(terms, links=()):
 
         # 0) Arama motoru (Bing): bio'sunda kelime gecen Instagram profilleri
         import re as _re
+        sayac = {}
         for t in terms:
-            for ek in ("", " whatsapp", " iletişim"):
+            sayac[t] = 0
+            for ek in ("", " whatsapp", " iletişim", " telefon", " sipariş"):
+                if sayac[t] >= LIMIT:
+                    break
                 q = f'site:instagram.com "{t}"{ek}'
-                for sayfa in range(3):
+                bos = 0
+                for sayfa in range(15):
+                    if sayac[t] >= LIMIT:
+                        break
                     url = f"https://www.bing.com/search?q={quote(q)}&first={sayfa * 10 + 1}&setlang=tr"
                     print(f"[bing] {url}")
                     try:
@@ -157,9 +167,11 @@ def main(terms, links=()):
                             u = (m.group(1) if m else h).strip(".").lower()
                             if u not in us:
                                 us.append(u)
-                        n = ekle(us, "bing")
-                        print(f"   ({n} yeni profil)")
-                        if n == 0:
+                        n = ekle(us, f"bing: {t}")
+                        sayac[t] += n
+                        print(f"   ({n} yeni profil | '{t}' toplam: {sayac[t]}/{LIMIT} | genel: {len(found)})")
+                        bos = bos + 1 if n == 0 else 0
+                        if bos >= 2:
                             break
                     except Exception as e:
                         print(f"   hata: {str(e)[:100]}")
@@ -296,4 +308,7 @@ if __name__ == "__main__":
     links = [_r.search(r"instagram\.com/([A-Za-z0-9_.]+)", a).group(1) if "instagram.com/" in a else a[1:]
              for a in args if "instagram.com/" in a or a.startswith("@")]
     terms = [a for a in args if not ("instagram.com/" in a or a.startswith("@"))]
+    for a in sys.argv[1:]:
+        if a.startswith("--limit="):
+            LIMIT = int(a.split("=")[1])
     main(terms, links)

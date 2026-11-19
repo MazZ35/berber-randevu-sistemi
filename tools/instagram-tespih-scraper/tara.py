@@ -8,6 +8,7 @@ import json
 import random
 import sys
 import time
+from urllib.parse import quote
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
@@ -15,12 +16,8 @@ from playwright.sync_api import sync_playwright
 LIMIT = 20          # kelime basina max profil
 OUT = Path("kuyruk.json")
 
-FETCH_JS = """async (url) => {
-  const r = await fetch(url, {headers: {'X-IG-App-ID': '936619743392459', 'X-Requested-With': 'XMLHttpRequest'},
-                              credentials: 'include'});
-  let body = null; try { body = await r.json(); } catch (e) {}
-  return {status: r.status, body};
-}"""
+HDR = {"X-IG-App-ID": "936619743392459", "X-Requested-With": "XMLHttpRequest",
+       "Referer": "https://www.instagram.com/"}
 
 
 def bekle(a=4, b=9):
@@ -56,12 +53,26 @@ def main(terms):
         else:
             sys.exit("5 dakika icinde giris yapilmadi.")
         print("Giris tamam.\n")
+        time.sleep(5)  # giris sonrasi yonlendirmeler bitsin
 
         def api(path):
             url = "https://www.instagram.com/api/v1/" + path
-            res = page.evaluate(FETCH_JS, url)
-            print(f"[{res['status']}] {url}")
-            return res["body"] if res["status"] == 200 else None
+            for deneme in range(3):
+                try:
+                    r = ctx.request.get(url, headers=HDR, timeout=30000)
+                    break
+                except Exception as e:
+                    print(f"[hata] {url}: {e}"); time.sleep(5)
+            else:
+                return None
+            print(f"[{r.status}] {r.url}")
+            if r.status != 200:
+                return None
+            try:
+                return r.json()
+            except Exception:
+                print("   (JSON degil - Instagram giris sayfasina yonlendirmis olabilir)")
+                return None
 
         users = []
         def add(lst):
@@ -73,7 +84,7 @@ def main(terms):
             return n
 
         for t in terms:
-            d = api(f"web/search/topsearch/?context=blended&query={t}")
+            d = api(f"web/search/topsearch/?context=blended&query={quote(t)}")
             if d:
                 add([x["user"]["username"] for x in d.get("users", [])])
             bekle()

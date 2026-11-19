@@ -11,12 +11,9 @@ if not sid:
     raise SystemExit("Hicbir sey yapistirilmadi. Tekrar calistirin.")
 print(f"Alindi: {len(sid)} karakter, '{sid[:6]}...' ile basliyor.")
 
-L = instaloader.Instaloader()
+L = instaloader.Instaloader(max_connection_attempts=1)
 L.context._session.cookies.set("sessionid", sid, domain=".instagram.com")
 L.context.username = user
-ok = L.test_login()
-if not ok:
-    print("Oturum gecersiz gorunuyor. Tarayicida giris yapili oldugundan emin olup tekrar deneyin.")
-else:
-    L.save_session_to_file()
-    print(f"Tamam! {ok} olarak oturum kaydedildi. Artik uygulamayi kullanabilirsiniz.")
+L.save_session_to_file()
+print("Tamam! Oturum dosyasi kaydedildi.")
+print("Not: Instagram 'birkac dakika bekleyin' dediyse aramaya 30-60 dk sonra baslayin.")

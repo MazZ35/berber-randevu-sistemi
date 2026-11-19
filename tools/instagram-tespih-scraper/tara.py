@@ -176,7 +176,7 @@ def main(terms, links=()):
                     return None, url
                 print(f"[{m}] {url}")
                 try:
-                    page.goto(url, wait_until="domcontentloaded", timeout=30000); bekle(3, 6)
+                    page.goto(url, wait_until="domcontentloaded", timeout=30000); bekle(8, 15)
                     html = page.content()
                     if any(x in html.lower() for x in ("captcha", "unusual traffic", "olağandışı trafik")):
                         print(f"   {m} robot dogrulamasi istiyor - Edge penceresinde dogrulayin (60 sn bekleniyor)")

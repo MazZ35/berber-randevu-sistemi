@@ -14,6 +14,11 @@ import time
 from pathlib import Path
 from urllib.parse import quote
 
+try:   # Windows konsolu emoji/Turkce karakterde hata vermesin
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 print = functools.partial(print, flush=True)
 
 from playwright.sync_api import sync_playwright

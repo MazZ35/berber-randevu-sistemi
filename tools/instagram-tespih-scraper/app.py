@@ -2,6 +2,7 @@
 Calistir:  py -m streamlit run app.py --server.port 8600
 """
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -82,7 +83,8 @@ with tab0:
     if start:
         log = ""
         proc = subprocess.Popen([sys.executable, "-u", str(HERE / "tara.py"), *terms, *links, f"--limit={int(limit)}", "--panel", *(["--sifirla"] if sifirla else []), *(["--motorlar"] if motorlar else [])],
-                                cwd=HERE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                cwd=HERE, env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 text=True, encoding="utf-8", errors="replace")
         for line in proc.stdout:
             log += line

@@ -124,10 +124,10 @@ with tab1:
             if back and ss.idx > 0:
                 ss.idx -= 1; st.rerun()
         with st.expander("Kuyruktaki tüm veriler (tablo)"):
-            st.dataframe(pd.DataFrame(q[ss.idx:]), use_container_width=True)
+            st.dataframe(pd.DataFrame(q[ss.idx:]), width="stretch")
 
 with tab2:
     df = load_saved()
-    st.dataframe(df, use_container_width=True)
+    st.dataframe(df, width="stretch")
     if EXCEL.exists():
         st.download_button("Excel indir", EXCEL.read_bytes(), EXCEL.name)

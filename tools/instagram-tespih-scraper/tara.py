@@ -45,13 +45,10 @@ def main(terms):
             ctx = pw.chromium.launch_persistent_context("ig_tarayici_profili", channel="chrome", headless=False)
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         page.goto("https://www.instagram.com/")
-        print("Instagram acildi. Giris yapili degilse acilan pencerede giris yapin...")
-        for _ in range(300):
-            if any(c["name"] == "sessionid" for c in ctx.cookies("https://www.instagram.com")):
-                break
-            time.sleep(1)
-        else:
-            sys.exit("5 dakika icinde giris yapilmadi.")
+        print("Instagram acildi. Acilan pencerede giris yapin; kod/dogrulama isterse tamamlayin.")
+        input(">>> Instagram ANA SAYFASINI (akisi) gorunce buraya donup ENTER'a basin... ")
+        if not any(c["name"] == "sessionid" for c in ctx.cookies("https://www.instagram.com")):
+            sys.exit("Giris bulunamadi. Pencerede giris yapip tekrar calistirin.")
         print("Giris tamam.\n")
         time.sleep(5)  # giris sonrasi yonlendirmeler bitsin
 

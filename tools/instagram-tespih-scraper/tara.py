@@ -1,119 +1,135 @@
-"""Ucretsiz tarama: kendi Edge/Chrome tarayiciniz uzerinden.
+"""Ucretsiz tarama: kendi Edge/Chrome tarayiciniz uzerinden, Instagram sayfalarini gercekten acarak.
 Kullanim:  py tara.py tespih "kehribar tespih" "oltu tespih"
-- Ilk calistirmada acilan pencerede Instagram'a giris yapin (bir kez; sonra hatirlanir).
-- Her istek ve bulunan her profil linki ekrana yazilir.
-- Sonuclar kuyruk.json dosyasina yazilir; uygulamada "Tarama sonuclarini yukle" ile kontrol edersiniz.
+- Acilan pencerede giris yapin, ana sayfayi gorunce terminalde ENTER'a basin.
+- Program arama sayfalarini acip kaydirir, sayfanin yukledigi verilerden profilleri toplar,
+  sonra her profili acip bio/iletisim bilgisini alir. Her adim ekrana yazilir.
+- Sonuclar kuyruk.json'a yazilir; uygulamada "Tarama sonuclarini yukle" ile kontrol edersiniz.
 """
 import json
 import random
 import sys
 import time
-from urllib.parse import quote
 from pathlib import Path
+from urllib.parse import quote
 
 from playwright.sync_api import sync_playwright
 
-LIMIT = 20          # kelime basina max profil
+LIMIT = 20            # kelime basina max profil
+SCROLL = 4            # arama sayfasinda kac kez asagi kaydirilsin
 OUT = Path("kuyruk.json")
-
-HDR = {"X-IG-App-ID": "936619743392459", "X-Requested-With": "XMLHttpRequest",
-       "Referer": "https://www.instagram.com/"}
+SKIP = {"instagram", "explore", "accounts", "p", "reel", "reels", "stories", "direct"}
 
 
-def bekle(a=4, b=9):
+def bekle(a=3, b=7):
     time.sleep(random.uniform(a, b))
 
 
-def usernames_in(obj, out):
+def walk(obj, users: dict):
+    """JSON icindeki tum kullanici nesnelerini toplar (username -> en zengin dict)."""
     if isinstance(obj, dict):
-        for k in ("owner", "user"):
-            v = obj.get(k)
-            if isinstance(v, dict) and v.get("username"):
-                out.append(v["username"])
+        u = obj.get("username")
+        if isinstance(u, str) and u:
+            prev = users.get(u, {})
+            if len(obj) > len(prev):
+                users[u] = obj
         for v in obj.values():
-            usernames_in(v, out)
+            walk(v, users)
     elif isinstance(obj, list):
         for v in obj:
-            usernames_in(v, out)
+            walk(v, users)
+
+
+def to_record(p: dict, u: str) -> dict:
+    addr = p.get("business_address_json") or {}
+    if isinstance(addr, str):
+        try:
+            addr = json.loads(addr)
+        except ValueError:
+            addr = {"street_address": addr}
+    fol = p.get("follower_count") or (p.get("edge_followed_by") or {}).get("count", "")
+    return {
+        "username": u, "fullName": p.get("full_name", ""), "followersCount": fol,
+        "businessCategoryName": p.get("business_category_name") or p.get("category") or p.get("category_name") or "",
+        "biography": p.get("biography", ""),
+        "externalUrl": p.get("external_url") or "",
+        "businessPhoneNumber": p.get("business_phone_number") or p.get("public_phone_number")
+                               or p.get("contact_phone_number") or "",
+        "businessEmail": p.get("business_email") or p.get("public_email") or "",
+        "businessAddress": addr or {"street_address": p.get("address_street", ""),
+                                    "city_name": p.get("city_name", "")},
+    }
 
 
 def main(terms):
+    seen: dict = {}
+
+    def on_response(resp):
+        try:
+            if "json" in (resp.headers.get("content-type") or ""):
+                walk(resp.json(), seen)
+        except Exception:
+            pass
+
     with sync_playwright() as pw:
         try:
             ctx = pw.chromium.launch_persistent_context("ig_tarayici_profili", channel="msedge", headless=False)
         except Exception:
             ctx = pw.chromium.launch_persistent_context("ig_tarayici_profili", channel="chrome", headless=False)
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        page.on("response", on_response)
         page.goto("https://www.instagram.com/")
         print("Instagram acildi. Acilan pencerede giris yapin; kod/dogrulama isterse tamamlayin.")
         input(">>> Instagram ANA SAYFASINI (akisi) gorunce buraya donup ENTER'a basin... ")
-        if not any(c["name"] == "sessionid" for c in ctx.cookies("https://www.instagram.com")):
-            sys.exit("Giris bulunamadi. Pencerede giris yapip tekrar calistirin.")
         print("Giris tamam.\n")
-        time.sleep(5)  # giris sonrasi yonlendirmeler bitsin
 
-        def api(path):
-            url = "https://www.instagram.com/api/v1/" + path
-            for deneme in range(3):
-                try:
-                    r = ctx.request.get(url, headers=HDR, timeout=30000)
-                    break
-                except Exception as e:
-                    print(f"[hata] {url}: {e}"); time.sleep(5)
-            else:
-                return None
-            print(f"[{r.status}] {r.url}")
-            if r.status != 200:
-                return None
-            try:
-                return r.json()
-            except Exception:
-                print("   (JSON degil - Instagram giris sayfasina yonlendirmis olabilir)")
-                return None
-
-        users = []
-        def add(lst):
-            n = 0
-            for u in lst:
-                if u not in users and n < LIMIT:
-                    users.append(u); n += 1
-                    print(f"   + https://www.instagram.com/{u}/")
-            return n
-
+        found = []
         for t in terms:
-            d = api(f"web/search/topsearch/?context=blended&query={quote(t)}")
-            if d:
-                add([x["user"]["username"] for x in d.get("users", [])])
-            bekle()
-            tag = t.replace(" ", "").lower()
-            d = api(f"tags/web_info/?tag_name={tag}")
-            if d:
-                found = []; usernames_in(d, found); add(found)
-            bekle()
+            for url in (f"https://www.instagram.com/explore/search/keyword/?q={quote(t)}",
+                        f"https://www.instagram.com/explore/search/keyword/?q={quote('#' + t.replace(' ', ''))}"):
+                before = set(seen)
+                print(f"[sayfa] {url}")
+                try:
+                    page.goto(url, wait_until="domcontentloaded")
+                    bekle()
+                    for _ in range(SCROLL):
+                        page.mouse.wheel(0, 4000); bekle(2, 4)
+                    # sayfadaki profil linkleri de (JSON gelmezse yedek)
+                    for href in page.eval_on_selector_all("a[href^='/']", "els => els.map(e => e.getAttribute('href'))"):
+                        parts = [x for x in href.split("/") if x]
+                        if len(parts) == 1 and parts[0] not in SKIP:
+                            seen.setdefault(parts[0], {"username": parts[0]})
+                except Exception as e:
+                    print(f"   hata: {e}")
+                new = [u for u in seen if u not in before and u not in found][:LIMIT]
+                for u in new:
+                    found.append(u)
+                    print(f"   + https://www.instagram.com/{u}/")
+                print(f"   ({len(new)} yeni profil)")
 
-        print(f"\nToplam {len(users)} profil bulundu. Detaylar cekiliyor...\n")
+        print(f"\nToplam {len(found)} profil. Profiller tek tek aciliyor...\n")
         old = json.loads(OUT.read_text("utf-8")) if OUT.exists() else []
         have = {p["username"] for p in old}
-        for u in users:
+        for u in found:
             if u in have:
                 continue
-            d = api(f"users/web_profile_info/?username={u}")
-            if d:
-                p = d["data"]["user"]
-                addr = p.get("business_address_json") or {}
-                if isinstance(addr, str):
-                    try: addr = json.loads(addr)
-                    except ValueError: addr = {"street_address": addr}
-                old.append({
-                    "username": p.get("username", u), "fullName": p.get("full_name", ""),
-                    "followersCount": (p.get("edge_followed_by") or {}).get("count", ""),
-                    "businessCategoryName": p.get("business_category_name") or p.get("category_name") or "",
-                    "biography": p.get("biography", ""), "externalUrl": p.get("external_url") or "",
-                    "businessPhoneNumber": p.get("business_phone_number") or "",
-                    "businessEmail": p.get("business_email") or "", "businessAddress": addr,
-                })
+            url = f"https://www.instagram.com/{u}/"
+            print(f"[profil] {url}")
+            try:
+                page.goto(url, wait_until="domcontentloaded")
+                bekle()
+                p = seen.get(u, {})
+                if "biography" not in p:  # JSON'da yoksa sayfadan oku
+                    desc = page.eval_on_selector("meta[name='description']", "e => e.content") or ""
+                    body = page.inner_text("header") if page.query_selector("header") else ""
+                    p = {**p, "biography": body or desc}
+                rec = to_record(p, u)
+                old.append(rec)
                 OUT.write_text(json.dumps(old, ensure_ascii=False, indent=1), "utf-8")
-                print(f"   bio: {p.get('biography','')[:80]!r}")
+                print(f"   bio: {rec['biography'][:90]!r}")
+                if rec["businessPhoneNumber"]:
+                    print(f"   tel: {rec['businessPhoneNumber']}")
+            except Exception as e:
+                print(f"   hata: {e}")
             bekle()
         ctx.close()
         print(f"\nBitti. {OUT} dosyasinda {len(old)} profil var. Uygulamada 'Tarama sonuclarini yukle' deyin.")

@@ -155,44 +155,71 @@ def main(terms, links=()):
             if u not in found:
                 found.append(u); print(f"   + https://www.instagram.com/{u}/   (dogrudan link)")
 
-        # 0) Arama motoru (Bing): bio'sunda kelime gecen Instagram profilleri
+        # 0) Arama motorlari: bio'sunda kelime gecen Instagram profilleri
+        #    Bing hata verirse DuckDuckGo, o da olmazsa Google denenir.
         import re as _re
+        MOTORLAR = {
+            "bing": lambda q, s: f"https://www.bing.com/search?q={quote(q)}&first={s * 10 + 1}&setlang=tr",
+            "duckduckgo": lambda q, s: f"https://html.duckduckgo.com/html/?q={quote(q)}&s={s * 30}&kl=tr-tr",
+            "google": lambda q, s: f"https://www.google.com/search?q={quote(q)}&start={s * 10}&hl=tr",
+        }
+        hata_say = {m: 0 for m in MOTORLAR}
         sayac = durum["sayac"]
+
+        def motor_ara(q, sayfa):
+            """Calisan ilk motorla arar; (kullanici listesi, kullanilan url) dondurur."""
+            for m, f in MOTORLAR.items():
+                if hata_say[m] >= 3:
+                    continue
+                url = f(q, sayfa)
+                if url in durum["bing_done"]:
+                    return None, url
+                print(f"[{m}] {url}")
+                try:
+                    page.goto(url, wait_until="domcontentloaded", timeout=30000); bekle(3, 6)
+                    html = page.content()
+                    if any(x in html.lower() for x in ("captcha", "unusual traffic", "olağandışı trafik")):
+                        print(f"   {m} robot dogrulamasi istiyor - Edge penceresinde dogrulayin (60 sn bekleniyor)")
+                        time.sleep(60); html = page.content()
+                    hata_say[m] = 0
+                    us = []
+                    for u in _re.findall(r"instagram\.com(?:%2F|/)([A-Za-z0-9_.]{2,30})", html):
+                        u = u.strip(".").lower()
+                        if u not in us:
+                            us.append(u)
+                    return us, url
+                except Exception as e:
+                    hata_say[m] += 1
+                    print(f"   {m} hata: {str(e)[:90]}")
+                    if hata_say[m] >= 3:
+                        print(f"   !!! {m} 3 kez hata verdi, artik kullanilmayacak.")
+            return [], None
+
         for t in terms:
             sayac.setdefault(t, 0)
             for ek in ("", " whatsapp", " iletişim", " telefon", " sipariş"):
-                if sayac[t] >= LIMIT:
+                if sayac[t] >= LIMIT or all(v >= 3 for v in hata_say.values()):
                     break
                 q = f'site:instagram.com "{t}"{ek}'
                 bos = 0
                 for sayfa in range(15):
                     if sayac[t] >= LIMIT:
                         break
-                    url = f"https://www.bing.com/search?q={quote(q)}&first={sayfa * 10 + 1}&setlang=tr"
-                    if url in durum["bing_done"]:
+                    us, url = motor_ara(q, sayfa)
+                    if us is None:
                         continue
-                    print(f"[bing] {url}")
-                    try:
-                        page.goto(url, wait_until="domcontentloaded"); bekle(3, 6)
-                        hrefs = page.eval_on_selector_all("a[href*='instagram.com/']",
-                                                          "els => els.map(e => e.href)")
-                        hrefs += _re.findall(r"instagram\.com/([A-Za-z0-9_.]{2,30})", page.content())
-                        us = []
-                        for h in hrefs:
-                            m = _re.search(r"instagram\.com/([A-Za-z0-9_.]{2,30})", h) if "/" in h else None
-                            u = (m.group(1) if m else h).strip(".").lower()
-                            if u not in us:
-                                us.append(u)
-                        n = ekle(us, f"bing: {t}")
-                        sayac[t] += n
-                        durum["bing_done"].append(url); kaydet()
-                        print(f"   ({n} yeni profil | '{t}' toplam: {sayac[t]}/{LIMIT} | genel: {len(found)})")
-                        bos = bos + 1 if n == 0 else 0
-                        if bos >= 2:
-                            break
-                    except Exception as e:
-                        print(f"   hata: {str(e)[:100]}")
+                    if url is None:
                         break
+                    n = ekle(us, f"arama: {t}")
+                    sayac[t] += n
+                    durum["bing_done"].append(url); kaydet()
+                    print(f"   ({n} yeni profil | '{t}' toplam: {sayac[t]}/{LIMIT} | genel: {len(found)})")
+                    bos = bos + 1 if n == 0 else 0
+                    if bos >= 2:
+                        break
+        if all(v >= 3 for v in hata_say.values()):
+            print("!!! Hicbir arama motoruna baglanilamadi. Internet/VPN/antivirus baglantiyi kesiyor olabilir.")
+        print(f"\n== Arama motorlari bitti: {len(found)} profil listede. Simdi Instagram aramasi, sonra profiller tek tek okunacak. ==\n")
 
         for t in terms:
             if t in durum["terim_done"]:

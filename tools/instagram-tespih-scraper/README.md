@@ -19,6 +19,15 @@ streamlit run app.py
    düzeltip **Onayla & kaydet**, **Atla** veya **Geri** diyebilirsiniz.
 4. "Kaydedilenler" sekmesinden Excel'i görüntüleyip indirebilirsiniz.
 
+## Ücretsiz mod (Instaloader)
+Kendi Instagram hesabınızla çalışır (ana hesabınız yerine **yedek bir hesap** kullanın).
+Bir kez terminalde giriş yapın (oturum dosyası kaydedilir, şifre uygulamaya girilmez):
+```powershell
+py -m instaloader --login KULLANICI_ADINIZ
+```
+Sonra uygulamada "Ücretsiz (Instaloader)" seçip kullanıcı adınızı yazın. Engellenmemek için
+her istek arasında 4-10 sn beklenir; az sayıda (günde birkaç yüz) profil tarayın.
+
 ## Neden Apify?
 Kendi Instagram hesabınızla doğrudan kazıma yapmak hesabınızın kısıtlanmasına/kapatılmasına yol açar.
 Meta'nın resmi Graph API'si anahtar kelimeyle kullanıcı aramaya izin vermez. Apify ücretli

@@ -7,7 +7,9 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from apify_source import flatten, profile_details, search_users
+import apify_source
+import instaloader_source
+from apify_source import flatten
 from extractor import extract
 
 EXCEL = Path(os.getenv("CIKTI_EXCEL", "tespih_profilleri.xlsx"))
@@ -41,15 +43,36 @@ def build_row(p: dict) -> dict:
 # ---------- Kenar cubugu: arama ----------
 with st.sidebar:
     st.header("1) Arama")
-    token = st.text_input("Apify API token", value=os.getenv("APIFY_TOKEN", ""), type="password")
+    kaynak = st.radio("Kaynak", ["Ücretsiz (Instaloader)", "Apify (ücretli)"])
+    if kaynak.startswith("Ücretsiz"):
+        ig_user = st.text_input("Instagram kullanıcı adınız (yedek hesap önerilir)")
+        ready = bool(ig_user)
+        st.caption("Önce terminalde bir kez: `py -m instaloader --login KULLANICI`")
+    else:
+        token = st.text_input("Apify API token", value=os.getenv("APIFY_TOKEN", ""), type="password")
+        ready = bool(token)
     terms = st.text_area("Arama kelimeleri (satir satir)",
                          "tespih\ntesbih\nkehribar tespih\noltu tespih\nkuka tespih\ntespih atölyesi").split("\n")
-    limit = st.number_input("Kelime basina max profil", 5, 200, 30)
-    batch = st.number_input("Detay cekme parti boyutu", 5, 100, 20)
+    limit = st.number_input("Kelime basina max profil", 5, 200, 20)
+    batch = st.number_input("Detay cekme parti boyutu", 5, 100, 10)
     only_contact = st.checkbox("Sadece iletisim bilgisi olanlari goster", True)
-    if st.button("Profilleri ara", type="primary", disabled=not token):
-        with st.spinner("Kullanicilar aranıyor..."):
-            users = search_users(token, [t.strip() for t in terms if t.strip()], int(limit))
+
+    def src():
+        if kaynak.startswith("Ücretsiz"):
+            if ss.get("L_user") != ig_user:
+                ss.L = instaloader_source.get_loader(ig_user); ss.L_user = ig_user
+            return (lambda t, l: instaloader_source.search_users(ss.L, t, l, log=ss.log.append),
+                    lambda us: instaloader_source.profile_details(ss.L, us, log=ss.log.append))
+        return (lambda t, l: apify_source.search_users(token, t, l),
+                lambda us: apify_source.profile_details(token, us))
+
+    if st.button("Profilleri ara", type="primary", disabled=not ready):
+        with st.spinner("Kullanicilar aranıyor (ücretsiz modda yavaştır, bekleyin)..."):
+            try:
+                users = src()[0]([t.strip() for t in terms if t.strip()], int(limit))
+            except FileNotFoundError:
+                st.error("Oturum dosyası yok. Terminalde `py -m instaloader --login KULLANICI` çalıştırın.")
+                users = []
         done = set(load_saved()["kullanici_adi"].astype(str))
         ss.pending_users = [u for u in users if u not in done]
         ss.log.append(f"{len(users)} profil bulundu, {len(ss.pending_users)} yeni.")
@@ -58,7 +81,7 @@ with st.sidebar:
     if pend and st.button(f"Sonraki {min(len(pend), int(batch))} profilin detayini cek"):
         part, ss.pending_users = pend[:int(batch)], pend[int(batch):]
         with st.spinner("Profil detaylari cekiliyor..."):
-            rows = [build_row(p) for p in profile_details(token, part)]
+            rows = [build_row(p) for p in src()[1](part)]
         if only_contact:
             rows = [r for r in rows if r["telefon"] or r["whatsapp"] or r["email"] or r["adres"]]
         ss.queue.extend(rows)

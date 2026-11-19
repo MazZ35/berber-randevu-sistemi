@@ -61,6 +61,8 @@ with st.sidebar:
              "", placeholder="https://www.instagram.com/kullanici/").split("\n") if l.strip()]
     limit = st.number_input("Kelime başına hedef profil", 10, 500, 100, step=10)
     st.caption("Uzun kelimeler önce taranır; aynı profil iki kez taranmaz.")
+    sifirla = st.checkbox("Baştan başla (önceki taramayı sil)", False,
+                          help="İşaretli değilse tarama kaldığı yerden devam eder.")
     only_contact = st.checkbox("Sadece iletişim bilgisi olanları göster", False)
     start = st.button("🔍 Taramayı başlat", type="primary")
     st.caption("Edge penceresi açılır. Giriş isterse orada giriş yapın; tarama kendiliğinden başlar.")
@@ -77,7 +79,7 @@ with tab0:
     out = st.empty()
     if start:
         log = ""
-        proc = subprocess.Popen([sys.executable, "-u", str(HERE / "tara.py"), *terms, *links, f"--limit={int(limit)}", "--panel"],
+        proc = subprocess.Popen([sys.executable, "-u", str(HERE / "tara.py"), *terms, *links, f"--limit={int(limit)}", "--panel", *(["--sifirla"] if sifirla else [])],
                                 cwd=HERE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 text=True, encoding="utf-8", errors="replace")
         for line in proc.stdout:

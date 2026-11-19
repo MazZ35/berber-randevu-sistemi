@@ -21,6 +21,7 @@ from playwright.sync_api import sync_playwright
 LIMIT = 100           # kelime basina hedef profil sayisi (--limit=N ile degisir)
 SCROLL = 4            # arama sayfasinda kac kez asagi kaydirilsin
 OUT = Path("kuyruk.json")
+DURUM = Path("durum.json")   # kaldigi yerden devam icin
 SKIP = {"instagram", "explore", "accounts", "p", "reel", "reels", "stories", "direct"}
 
 
@@ -107,7 +108,20 @@ def main(terms, links=()):
             me = {c["value"] for c in ctx.cookies("https://www.instagram.com") if c["name"] == "ds_user_id"}
         except Exception:
             pass
-        found = []
+        durum = {"found": [], "bing_done": [], "sayac": {}, "terim_done": []}
+        if "--sifirla" in sys.argv:
+            for f in (DURUM, OUT):
+                f.unlink(missing_ok=True)
+            print("Onceki tarama silindi, bastan basliyor.")
+        elif DURUM.exists():
+            durum.update(json.loads(DURUM.read_text("utf-8")))
+            print(f"KALDIGI YERDEN DEVAM: {len(durum['found'])} profil daha once bulunmustu, "
+                  f"{len(durum['bing_done'])} Bing sayfasi atlanacak.")
+
+        def kaydet():
+            DURUM.write_text(json.dumps(durum, ensure_ascii=False), "utf-8")
+
+        found = durum["found"]
         bad = SKIP | {"popular", "about", "legal", "web", "developer", "explore", "tags", "locations", "tv", "api", "static", "accounts", "privacy", "terms", "help"}
 
         def ekle(us, kaynak):
@@ -143,9 +157,9 @@ def main(terms, links=()):
 
         # 0) Arama motoru (Bing): bio'sunda kelime gecen Instagram profilleri
         import re as _re
-        sayac = {}
+        sayac = durum["sayac"]
         for t in terms:
-            sayac[t] = 0
+            sayac.setdefault(t, 0)
             for ek in ("", " whatsapp", " iletişim", " telefon", " sipariş"):
                 if sayac[t] >= LIMIT:
                     break
@@ -155,6 +169,8 @@ def main(terms, links=()):
                     if sayac[t] >= LIMIT:
                         break
                     url = f"https://www.bing.com/search?q={quote(q)}&first={sayfa * 10 + 1}&setlang=tr"
+                    if url in durum["bing_done"]:
+                        continue
                     print(f"[bing] {url}")
                     try:
                         page.goto(url, wait_until="domcontentloaded"); bekle(3, 6)
@@ -169,6 +185,7 @@ def main(terms, links=()):
                                 us.append(u)
                         n = ekle(us, f"bing: {t}")
                         sayac[t] += n
+                        durum["bing_done"].append(url); kaydet()
                         print(f"   ({n} yeni profil | '{t}' toplam: {sayac[t]}/{LIMIT} | genel: {len(found)})")
                         bos = bos + 1 if n == 0 else 0
                         if bos >= 2:
@@ -178,6 +195,8 @@ def main(terms, links=()):
                         break
 
         for t in terms:
+            if t in durum["terim_done"]:
+                continue
             # 1) Arama kutusu (hesap sonuclari)
             print(f"[arama kutusu] '{t}'")
             def ara():
@@ -235,6 +254,7 @@ def main(terms, links=()):
                 if owner:
                     n += ekle([owner], f"gonderi {code}")
             print(f"   ({n} yeni profil)")
+            durum["terim_done"].append(t); kaydet()
 
         print(f"\nToplam {len(found)} profil. Profiller tek tek aciliyor...\n")
         old = json.loads(OUT.read_text("utf-8")) if OUT.exists() else []

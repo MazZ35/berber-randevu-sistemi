@@ -57,6 +57,8 @@ with st.sidebar:
     st.header("1) Tarama")
     terms = [t.strip() for t in st.text_area("Arama kelimeleri (satır satır)",
              "tespih\nkehribar tespih\noltu tespih").split("\n") if t.strip()]
+    links = [l.strip() for l in st.text_area("Doğrudan profil linkleri (isteğe bağlı, satır satır)",
+             "", placeholder="https://www.instagram.com/kullanici/").split("\n") if l.strip()]
     only_contact = st.checkbox("Sadece iletişim bilgisi olanları göster", False)
     start = st.button("🔍 Taramayı başlat", type="primary")
     st.caption("Edge penceresi açılır. Giriş isterse orada giriş yapın; tarama kendiliğinden başlar.")
@@ -73,7 +75,7 @@ with tab0:
     out = st.empty()
     if start:
         log = ""
-        proc = subprocess.Popen([sys.executable, "-u", str(HERE / "tara.py"), *terms, "--panel"],
+        proc = subprocess.Popen([sys.executable, "-u", str(HERE / "tara.py"), *terms, *links, "--panel"],
                                 cwd=HERE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 text=True, encoding="utf-8", errors="replace")
         for line in proc.stdout:

@@ -63,7 +63,7 @@ def to_record(p: dict, u: str) -> dict:
     }
 
 
-def main(terms):
+def main(terms, links=()):
     seen: dict = {}
 
     def on_response(resp):
@@ -132,6 +132,10 @@ def main(terms):
                 if len(d) > len(seen.get(u, {})):
                     seen[u] = d
             return local
+
+        for u in links:
+            if u not in found:
+                found.append(u); print(f"   + https://www.instagram.com/{u}/   (dogrudan link)")
 
         # 0) Arama motoru (Bing): bio'sunda kelime gecen Instagram profilleri
         import re as _re
@@ -249,4 +253,9 @@ def main(terms):
 
 
 if __name__ == "__main__":
-    main([a for a in sys.argv[1:] if not a.startswith("--")] or ["tespih"])
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    import re as _r
+    links = [_r.search(r"instagram\.com/([A-Za-z0-9_.]+)", a).group(1) if "instagram.com/" in a else a[1:]
+             for a in args if "instagram.com/" in a or a.startswith("@")]
+    terms = [a for a in args if not ("instagram.com/" in a or a.startswith("@"))]
+    main(terms, links)

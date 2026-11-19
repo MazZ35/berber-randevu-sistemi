@@ -250,11 +250,18 @@ def main(terms, links=()):
 
                 def topla(sekme):
                     n0 = len(sonuc)
-                    for _ in range(5):                    # listeyi kaydirarak daha fazla sonuc
+                    bos = 0
+                    for _ in range(60):                   # yeni hesap gelmeyene kadar kaydir
+                        once = len(sonuc)
                         for u in linkler_ekranda():
                             if u not in onceki and u not in sonuc:
                                 sonuc.append(u)
-                        page.mouse.move(900, 500); page.mouse.wheel(0, 1500); bekle(1, 2)
+                        if len(sonuc) - n0 >= LIMIT:
+                            break
+                        bos = bos + 1 if len(sonuc) == once else 0
+                        if bos >= 4:
+                            break
+                        page.mouse.move(900, 600); page.mouse.wheel(0, 2500); bekle(1.5, 3)
                     print(f"   '{sekme}' sekmesi: {len(sonuc) - n0} hesap")
 
                 topla("Senin için")

@@ -226,20 +226,56 @@ def main(terms, links=()):
                 continue
             # 1) Arama kutusu (hesap sonuclari)
             print(f"[arama kutusu] '{t}'")
+            def linkler_ekranda():
+                out = []
+                for h in page.eval_on_selector_all("a[href^='/']", "els => els.map(e => e.getAttribute('href'))"):
+                    p_ = [x for x in h.split("?")[0].split("/") if x]
+                    if len(p_) == 1 and p_[0] not in bad and p_[0] not in out:
+                        out.append(p_[0])
+                return out
+
             def ara():
-                page.goto("https://www.instagram.com/", wait_until="domcontentloaded"); bekle(3, 5)
+                page.goto("https://www.instagram.com/", wait_until="domcontentloaded"); bekle(4, 6)
+                onceki = set(linkler_ekranda())          # menu / oneriler: sayilmayacak
                 for name in ("Search", "Ara"):
                     loc = page.get_by_role("link", name=name)
                     if loc.count():
                         loc.first.click(); break
                 bekle(1, 2)
-                box = page.locator("input[placeholder='Search'], input[placeholder='Ara'], input[aria-label*='Search'], input[aria-label*='Ara']")
+                box = page.locator("input[placeholder='Search'], input[placeholder='Ara'], "
+                                   "input[aria-label*='Search'], input[aria-label*='Ara']")
                 box.first.fill(t)
-                bekle(4, 6)
+                bekle(3, 5)
+                # "Kisisellestirilmemis" secenegi
+                for txt in ("Kişiselleştirilmemiş", "Kişiselleştirilmemiş sonuçlar", "Not personalized",
+                            "Non-personalized"):
+                    try:
+                        loc = page.get_by_text(txt, exact=False)
+                        if loc.count():
+                            loc.first.click(timeout=3000)
+                            print(f"   '{txt}' secildi")
+                            bekle(3, 5)
+                            break
+                    except Exception:
+                        pass
+                sonuc = []
+                for _ in range(6):                        # listeyi kaydirarak daha fazla sonuc
+                    for u in linkler_ekranda():
+                        if u not in onceki and u not in sonuc:
+                            sonuc.append(u)
+                    try:
+                        box.first.hover(); page.mouse.wheel(0, 1500)
+                    except Exception:
+                        pass
+                    bekle(1, 2)
+                return sonuc
+
             try:
-                res = capture(ara)
-                users = [u for u, d in res.items() if "full_name" in d or "is_verified" in d]
-                print(f"   ({ekle(users, 'arama')} yeni profil)")
+                users = []
+                res = capture(lambda: users.extend(ara()))
+                users += [u for u, d in res.items() if ("full_name" in d or "is_verified" in d) and u not in users]
+                print(f"   ({ekle(users, 'arama kutusu: ' + t)} yeni profil)")
+                kaydet()
             except Exception as e:
                 print(f"   arama kutusu kullanilamadi: {str(e)[:100]}")
 

@@ -30,9 +30,13 @@ HDR = {
 }
 
 
+SCANNED: list[dict] = []  # yapilan her istegin kaydi (arayuzde gosterilir)
+
+
 def _get(L, path: str, params: dict) -> dict:
     r = L.context._session.get("https://www.instagram.com/api/v1/" + path, params=params,
                                headers=HDR, timeout=30)
+    SCANNED.append({"saat": time.strftime("%H:%M:%S"), "durum": r.status_code, "adres": r.url})
     if r.status_code != 200:
         raise RuntimeError(f"{r.status_code} {r.text[:120]}")
     return r.json()

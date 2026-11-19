@@ -75,6 +75,7 @@ with st.sidebar:
                 users = []
         done = set(load_saved()["kullanici_adi"].astype(str))
         ss.pending_users = [u for u in users if u not in done]
+        ss.found_users = users
         ss.log.append(f"{len(users)} profil bulundu, {len(ss.pending_users)} yeni.")
     pend = ss.get("pending_users", [])
     st.write(f"Detayi cekilmemis: **{len(pend)}**")
@@ -92,7 +93,22 @@ with st.sidebar:
 
 # ---------- Ana alan: adim adim kontrol ----------
 st.title("Tespih profilleri – adım adım kontrol")
-tab1, tab2 = st.tabs(["Kontrol", f"Kaydedilenler ({EXCEL.name})"])
+tab1, tab2, tab3 = st.tabs(["Kontrol", f"Kaydedilenler ({EXCEL.name})", "Tarama kaydı"])
+
+with tab3:
+    st.subheader("Instagram'a yapılan istekler")
+    st.caption("Durum 200 = başarılı. 401/404/429 = Instagram reddetti.")
+    log_df = pd.DataFrame(instaloader_source.SCANNED[::-1])
+    if log_df.empty:
+        st.info("Henüz istek yapılmadı.")
+    else:
+        st.dataframe(log_df, width="stretch",
+                     column_config={"adres": st.column_config.LinkColumn("adres")})
+    st.subheader("Bulunan profiller")
+    fu = ss.get("found_users", [])
+    st.write(f"{len(fu)} profil")
+    for u in fu:
+        st.markdown(f"- [@{u}](https://www.instagram.com/{u}/)")
 
 with tab1:
     q = ss.queue

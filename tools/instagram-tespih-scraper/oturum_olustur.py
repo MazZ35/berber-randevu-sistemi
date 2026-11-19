@@ -6,7 +6,10 @@ import getpass
 import instaloader
 
 user = input("Instagram kullanici adi: ").strip()
-sid = getpass.getpass("sessionid cerezi (yapistirin, ekranda gorunmez): ").strip()
+sid = getpass.getpass("sessionid cerezi (sag tik ile yapistirip Enter; ekranda gorunmez): ").strip()
+if not sid:
+    raise SystemExit("Hicbir sey yapistirilmadi. Tekrar calistirin.")
+print(f"Alindi: {len(sid)} karakter, '{sid[:6]}...' ile basliyor.")
 
 L = instaloader.Instaloader()
 L.context._session.cookies.set("sessionid", sid, domain=".instagram.com")

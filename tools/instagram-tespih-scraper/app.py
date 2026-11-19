@@ -45,7 +45,8 @@ def kuyrugu_yukle(only_contact: bool) -> int:
     if not KUYRUK.exists():
         return 0
     done = set(load_saved()["kullanici_adi"].astype(str))
-    rows = [build_row(p) for p in json.loads(KUYRUK.read_text("utf-8")) if p["username"] not in done]
+    rows = [build_row(p) for p in json.loads(KUYRUK.read_text("utf-8"))
+            if p["username"] not in done and (p.get("biography") or "").strip()]
     if only_contact:
         rows = [r for r in rows if r["telefon"] or r["whatsapp"] or r["email"] or r["adres"]]
     ss.queue, ss.idx = rows, 0
@@ -97,32 +98,35 @@ with tab0:
 
 with tab1:
     q = ss.queue
-    if ss.idx >= len(q):
-        st.info("Kontrol edilecek profil yok. Önce tarama yapın ya da 'Tarama sonuçlarını yükle' deyin.")
+    if not q:
+        st.info("Liste boş. Önce tarama yapın ya da 'Tarama sonuçlarını yükle' deyin.")
     else:
-        r = q[ss.idx]
-        st.progress(ss.idx / len(q), text=f"{ss.idx + 1} / {len(q)}")
+        st.caption("Hücrelere tıklayıp düzeltebilirsiniz. Kaydetmek istediklerinizi işaretleyip alttaki düğmeye basın.")
+        df = pd.DataFrame(q)
+        df.insert(0, "kaydet", df["telefon"].astype(bool) | df["whatsapp"].astype(bool))
+        ed = st.data_editor(
+            df[["kaydet", "kullanici_adi", "ad", "telefon", "whatsapp", "email", "il", "ilce", "adres",
+                "takipci", "profil_url", "web", "bio"]],
+            width="stretch", height=600, hide_index=True,
+            column_config={
+                "kaydet": st.column_config.CheckboxColumn("✔", width="small"),
+                "profil_url": st.column_config.LinkColumn("profil"),
+                "bio": st.column_config.TextColumn("bio", width="large"),
+            },
+            disabled=["kullanici_adi", "profil_url", "takipci"],
+        )
+        secili = ed[ed["kaydet"]]
         c1, c2 = st.columns(2)
-        with c1:
-            st.subheader(f"@{r['kullanici_adi']}  ·  {r['ad']}")
-            st.markdown(f"[Profili aç]({r['profil_url']})  ·  Takipçi: {r['takipci']}  ·  {r['kategori']}")
-            st.text_area("Bio (ham veri)", r["bio"], height=240, disabled=True)
-            if r["web"]:
-                st.write("Link:", r["web"])
-        with c2:
-            with st.form(f"f{ss.idx}"):
-                ed = {k: st.text_input(k, str(r[k] or "")) for k in
-                      ["telefon", "whatsapp", "email", "il", "ilce", "adres"]}
-                a, b, c = st.columns(3)
-                ok = a.form_submit_button("✅ Onayla & kaydet", type="primary")
-                skip = b.form_submit_button("⏭ Atla")
-                back = c.form_submit_button("⏮ Geri")
-            if ok:
-                save_row({**r, **ed}); ss.idx += 1; st.rerun()
-            if skip:
-                ss.idx += 1; st.rerun()
-            if back and ss.idx > 0:
-                ss.idx -= 1; st.rerun()
+        if c1.button(f"✅ İşaretli {len(secili)} profili Excel'e kaydet", type="primary"):
+            for _, r in secili.drop(columns=["kaydet"]).iterrows():
+                save_row({k: r.get(k, "") for k in COLS})
+            kayitli = set(secili["kullanici_adi"])
+            ss.queue = [x for x in q if x["kullanici_adi"] not in kayitli]
+            st.success(f"{len(secili)} profil kaydedildi."); st.rerun()
+        if c2.button("Tümünü işaretle ve kaydet"):
+            for _, r in ed.drop(columns=["kaydet"]).iterrows():
+                save_row({k: r.get(k, "") for k in COLS})
+            ss.queue = []; st.rerun()
 
 with tab2:
     df = load_saved()

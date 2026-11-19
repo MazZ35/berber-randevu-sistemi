@@ -360,6 +360,7 @@ def main(terms, links=()):
 
         print(f"\nToplam {len(found)} profil. Profiller tek tek aciliyor...\n")
         old = json.loads(OUT.read_text("utf-8")) if OUT.exists() else []
+        old = [p for p in old if (p.get("biography") or "").strip()]   # bos okunanlar tekrar denensin
         have = {p["username"] for p in old}
         for u in found:
             if u in have:
@@ -412,6 +413,16 @@ def main(terms, links=()):
                     p["external_url"] = " ".join(linkler)
                     print(f"   linkler: {linkler}")
                 rec = to_record(p, u)
+                if not rec["biography"].strip() and not rec["externalUrl"]:
+                    print("   !!! sayfa bos geldi (Instagram engellemis olabilir) - kaydedilmedi, sonra tekrar denenecek")
+                    bos_say = locals().get("bos_say", 0) + 1
+                    if bos_say >= 5:
+                        print("!!! Arka arkaya 5 profil bos geldi. Instagram sizi yavaslatmis. "
+                              "1 saat sonra 'Taramayi baslat' deyin, kaldigi yerden devam eder.")
+                        break
+                    bekle(20, 40)
+                    continue
+                bos_say = 0
                 old.append(rec)
                 OUT.write_text(json.dumps(old, ensure_ascii=False, indent=1), "utf-8")
                 print(f"   bio: {rec['biography'][:90]!r}")

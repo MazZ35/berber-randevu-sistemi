@@ -104,12 +104,12 @@ def main(terms):
         except Exception:
             pass
         found = []
-        bad = SKIP | {"popular", "about", "legal", "web", "developer", "explore"}
+        bad = SKIP | {"popular", "about", "legal", "web", "developer", "explore", "tags", "locations", "tv", "api", "static", "accounts", "privacy", "terms", "help"}
 
         def ekle(us, kaynak):
             n = 0
             for u in us:
-                if u and u not in found and u not in bad and n < LIMIT:
+                if u and u not in found and u not in bad and n < LIMIT * 3:
                     found.append(u); n += 1
                     print(f"   + https://www.instagram.com/{u}/   ({kaynak})")
             return n
@@ -132,6 +132,33 @@ def main(terms):
                 if len(d) > len(seen.get(u, {})):
                     seen[u] = d
             return local
+
+        # 0) Arama motoru (Bing): bio'sunda kelime gecen Instagram profilleri
+        import re as _re
+        for t in terms:
+            for ek in ("", " whatsapp", " iletişim"):
+                q = f'site:instagram.com "{t}"{ek}'
+                for sayfa in range(3):
+                    url = f"https://www.bing.com/search?q={quote(q)}&first={sayfa * 10 + 1}&setlang=tr"
+                    print(f"[bing] {url}")
+                    try:
+                        page.goto(url, wait_until="domcontentloaded"); bekle(3, 6)
+                        hrefs = page.eval_on_selector_all("a[href*='instagram.com/']",
+                                                          "els => els.map(e => e.href)")
+                        hrefs += _re.findall(r"instagram\.com/([A-Za-z0-9_.]{2,30})", page.content())
+                        us = []
+                        for h in hrefs:
+                            m = _re.search(r"instagram\.com/([A-Za-z0-9_.]{2,30})", h) if "/" in h else None
+                            u = (m.group(1) if m else h).strip(".").lower()
+                            if u not in us:
+                                us.append(u)
+                        n = ekle(us, "bing")
+                        print(f"   ({n} yeni profil)")
+                        if n == 0:
+                            break
+                    except Exception as e:
+                        print(f"   hata: {str(e)[:100]}")
+                        break
 
         for t in terms:
             # 1) Arama kutusu (hesap sonuclari)

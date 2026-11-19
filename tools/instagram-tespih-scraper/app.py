@@ -78,6 +78,15 @@ with st.sidebar:
         ss.found_users = users
         ss.log.append(f"{len(users)} profil bulundu, {len(ss.pending_users)} yeni.")
     pend = ss.get("pending_users", [])
+    if Path("kuyruk.json").exists() and st.button("📂 Tarama sonuçlarını yükle (tara.py)"):
+        import json
+        done = set(load_saved()["kullanici_adi"].astype(str))
+        rows = [build_row(p) for p in json.loads(Path("kuyruk.json").read_text("utf-8"))
+                if p["username"] not in done]
+        if only_contact:
+            rows = [r for r in rows if r["telefon"] or r["whatsapp"] or r["email"] or r["adres"]]
+        ss.queue, ss.idx = rows, 0
+        ss.log.append(f"kuyruk.json: {len(rows)} profil kontrole eklendi.")
     st.write(f"Detayi cekilmemis: **{len(pend)}**")
     if pend and st.button(f"Sonraki {min(len(pend), int(batch))} profilin detayini cek"):
         part, ss.pending_users = pend[:int(batch)], pend[int(batch):]

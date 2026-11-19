@@ -5,12 +5,15 @@ Kullanim:  py tara.py tespih "kehribar tespih" "oltu tespih"
   sonra her profili acip bio/iletisim bilgisini alir. Her adim ekrana yazilir.
 - Sonuclar kuyruk.json'a yazilir; uygulamada "Tarama sonuclarini yukle" ile kontrol edersiniz.
 """
+import functools
 import json
 import random
 import sys
 import time
 from pathlib import Path
 from urllib.parse import quote
+
+print = functools.partial(print, flush=True)
 
 from playwright.sync_api import sync_playwright
 
@@ -79,7 +82,20 @@ def main(terms):
         page.on("response", on_response)
         page.goto("https://www.instagram.com/")
         print("Instagram acildi. Acilan pencerede giris yapin; kod/dogrulama isterse tamamlayin.")
-        input(">>> Instagram ANA SAYFASINI (akisi) gorunce buraya donup ENTER'a basin... ")
+        if "--panel" in sys.argv:
+            print(">>> Giris bekleniyor (kod isterse pencerede girin)...", flush=True)
+            ok = 0
+            for _ in range(600):
+                logged = any(c["name"] == "sessionid" for c in ctx.cookies("https://www.instagram.com"))
+                u = page.url
+                ok = ok + 1 if logged and not any(x in u for x in ("challenge", "accounts/", "two_factor", "auth_platform")) else 0
+                if ok >= 5:
+                    break
+                time.sleep(1)
+            else:
+                sys.exit("10 dakika icinde giris tamamlanmadi.")
+        else:
+            input(">>> Instagram ANA SAYFASINI (akisi) gorunce buraya donup ENTER'a basin... ")
         print("Giris tamam.\n")
 
         me = set()
@@ -206,4 +222,4 @@ def main(terms):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:] or ["tespih"])
+    main([a for a in sys.argv[1:] if not a.startswith("--")] or ["tespih"])

@@ -82,29 +82,99 @@ def main(terms):
         input(">>> Instagram ANA SAYFASINI (akisi) gorunce buraya donup ENTER'a basin... ")
         print("Giris tamam.\n")
 
+        me = set()
+        try:
+            me = {c["value"] for c in ctx.cookies("https://www.instagram.com") if c["name"] == "ds_user_id"}
+        except Exception:
+            pass
         found = []
-        for t in terms:
-            for url in (f"https://www.instagram.com/explore/search/keyword/?q={quote(t)}",
-                        f"https://www.instagram.com/explore/search/keyword/?q={quote('#' + t.replace(' ', ''))}"):
-                before = set(seen)
-                print(f"[sayfa] {url}")
+        bad = SKIP | {"popular", "about", "legal", "web", "developer", "explore"}
+
+        def ekle(us, kaynak):
+            n = 0
+            for u in us:
+                if u and u not in found and u not in bad and n < LIMIT:
+                    found.append(u); n += 1
+                    print(f"   + https://www.instagram.com/{u}/   ({kaynak})")
+            return n
+
+        def capture(action):
+            """action() sirasinda gelen JSON'lardaki kullanicilari dondurur."""
+            local: dict = {}
+            def h(resp):
                 try:
-                    page.goto(url, wait_until="domcontentloaded")
-                    bekle()
-                    for _ in range(SCROLL):
-                        page.mouse.wheel(0, 4000); bekle(2, 4)
-                    # sayfadaki profil linkleri de (JSON gelmezse yedek)
-                    for href in page.eval_on_selector_all("a[href^='/']", "els => els.map(e => e.getAttribute('href'))"):
-                        parts = [x for x in href.split("/") if x]
-                        if len(parts) == 1 and parts[0] not in SKIP:
-                            seen.setdefault(parts[0], {"username": parts[0]})
-                except Exception as e:
-                    print(f"   hata: {e}")
-                new = [u for u in seen if u not in before and u not in found][:LIMIT]
-                for u in new:
-                    found.append(u)
-                    print(f"   + https://www.instagram.com/{u}/")
-                print(f"   ({len(new)} yeni profil)")
+                    if "json" in (resp.headers.get("content-type") or ""):
+                        walk(resp.json(), local)
+                except Exception:
+                    pass
+            page.on("response", h)
+            try:
+                action()
+            finally:
+                page.remove_listener("response", h)
+            for u, d in local.items():
+                if len(d) > len(seen.get(u, {})):
+                    seen[u] = d
+            return local
+
+        for t in terms:
+            # 1) Arama kutusu (hesap sonuclari)
+            print(f"[arama kutusu] '{t}'")
+            def ara():
+                page.goto("https://www.instagram.com/", wait_until="domcontentloaded"); bekle(3, 5)
+                for name in ("Search", "Ara"):
+                    loc = page.get_by_role("link", name=name)
+                    if loc.count():
+                        loc.first.click(); break
+                bekle(1, 2)
+                box = page.locator("input[placeholder='Search'], input[placeholder='Ara'], input[aria-label*='Search'], input[aria-label*='Ara']")
+                box.first.fill(t)
+                bekle(4, 6)
+            try:
+                res = capture(ara)
+                users = [u for u, d in res.items() if "full_name" in d or "is_verified" in d]
+                print(f"   ({ekle(users, 'arama')} yeni profil)")
+            except Exception as e:
+                print(f"   arama kutusu kullanilamadi: {str(e)[:100]}")
+
+            # 2) Anahtar kelime sayfasindaki gonderiler -> sahipleri
+            url = f"https://www.instagram.com/explore/search/keyword/?q={quote(t)}"
+            print(f"[sayfa] {url}")
+            posts = []
+            try:
+                page.goto(url, wait_until="domcontentloaded"); bekle()
+                for _ in range(SCROLL):
+                    page.mouse.wheel(0, 4000); bekle(2, 4)
+                for href in page.eval_on_selector_all("a[href*='/p/'], a[href*='/reel/']",
+                                                      "els => els.map(e => e.getAttribute('href'))"):
+                    if href not in posts:
+                        posts.append(href)
+            except Exception as e:
+                print(f"   hata: {str(e)[:100]}")
+            print(f"   {len(posts)} gonderi bulundu, sahipleri aliniyor...")
+            n = 0
+            for href in posts[:LIMIT]:
+                parts = [x for x in href.split("/") if x]
+                owner = parts[0] if parts[0] not in ("p", "reel") else None   # /kullanici/p/KOD/ bicimi
+                code = parts[parts.index("p" if "p" in parts else "reel") + 1]
+                if not owner:
+                    try:
+                        local = capture(lambda: (page.goto("https://www.instagram.com" + href,
+                                                           wait_until="domcontentloaded"), bekle(2, 4)))
+                        cands = [u for u, d in local.items() if u not in me]
+                        # once gonderinin kendi sahibini bul
+                        og = page.eval_on_selector("meta[property='og:url']", "e => e.content") or ""
+                        ogp = [x for x in og.replace("https://www.instagram.com/", "").split("/") if x]
+                        if ogp and ogp[0] not in ("p", "reel"):
+                            owner = ogp[0]
+                        else:
+                            desc = page.eval_on_selector("meta[property='og:title']", "e => e.content") or ""
+                            owner = next((u for u in cands if u in desc), None) or (cands[0] if cands else None)
+                    except Exception as e:
+                        print(f"   {code}: {str(e)[:80]}")
+                if owner:
+                    n += ekle([owner], f"gonderi {code}")
+            print(f"   ({n} yeni profil)")
 
         print(f"\nToplam {len(found)} profil. Profiller tek tek aciliyor...\n")
         old = json.loads(OUT.read_text("utf-8")) if OUT.exists() else []

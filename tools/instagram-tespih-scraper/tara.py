@@ -235,39 +235,37 @@ def main(terms, links=()):
                 return out
 
             def ara():
-                page.goto("https://www.instagram.com/", wait_until="domcontentloaded"); bekle(4, 6)
-                onceki = set(linkler_ekranda())          # menu / oneriler: sayilmayacak
-                for name in ("Search", "Ara"):
-                    loc = page.get_by_role("link", name=name)
-                    if loc.count():
-                        loc.first.click(); break
-                bekle(1, 2)
-                box = page.locator("input[placeholder='Search'], input[placeholder='Ara'], "
-                                   "input[aria-label*='Search'], input[aria-label*='Ara']")
-                box.first.fill(t)
-                bekle(3, 5)
-                # "Kisisellestirilmemis" secenegi
-                for txt in ("Kişiselleştirilmemiş", "Kişiselleştirilmemiş sonuçlar", "Not personalized",
-                            "Non-personalized"):
-                    try:
-                        loc = page.get_by_text(txt, exact=False)
+                page.goto("https://www.instagram.com/explore/", wait_until="domcontentloaded"); bekle(4, 6)
+                box = page.locator("input[placeholder='Ara'], input[placeholder='Search'], "
+                                   "input[aria-label*='Ara'], input[aria-label*='Search'], input[type='text']")
+                if not box.count():                      # kutu yoksa soldaki Ara ikonuna tikla
+                    for name in ("Ara", "Search"):
+                        loc = page.get_by_role("link", name=name)
                         if loc.count():
-                            loc.first.click(timeout=3000)
-                            print(f"   '{txt}' secildi")
-                            bekle(3, 5)
-                            break
-                    except Exception:
-                        pass
+                            loc.first.click(); bekle(1, 2); break
+                onceki = set(linkler_ekranda())          # menu / alt bilgi linkleri: sayilmayacak
+                box.first.click(); box.first.fill(t)
+                bekle(4, 6)
                 sonuc = []
-                for _ in range(6):                        # listeyi kaydirarak daha fazla sonuc
-                    for u in linkler_ekranda():
-                        if u not in onceki and u not in sonuc:
-                            sonuc.append(u)
-                    try:
-                        box.first.hover(); page.mouse.wheel(0, 1500)
-                    except Exception:
-                        pass
-                    bekle(1, 2)
+
+                def topla(sekme):
+                    n0 = len(sonuc)
+                    for _ in range(5):                    # listeyi kaydirarak daha fazla sonuc
+                        for u in linkler_ekranda():
+                            if u not in onceki and u not in sonuc:
+                                sonuc.append(u)
+                        page.mouse.move(900, 500); page.mouse.wheel(0, 1500); bekle(1, 2)
+                    print(f"   '{sekme}' sekmesi: {len(sonuc) - n0} hesap")
+
+                topla("Senin için")
+                for txt in ("Kişiselleştirilmemiş", "Not personalized"):
+                    loc = page.get_by_text(txt, exact=True)
+                    if loc.count():
+                        loc.first.click(timeout=3000); bekle(3, 5)
+                        topla(txt)
+                        break
+                else:
+                    print("   'Kişiselleştirilmemiş' sekmesi bulunamadi")
                 return sonuc
 
             try:

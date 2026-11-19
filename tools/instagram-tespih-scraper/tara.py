@@ -85,6 +85,23 @@ def main(terms, links=()):
             ctx = pw.chromium.launch_persistent_context("ig_tarayici_profili", channel="chrome", headless=False)
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         page.on("response", on_response)
+        _goto = page.goto
+
+        def guvenli_goto(url, **kw):
+            kw.setdefault("wait_until", "domcontentloaded")
+            kw.setdefault("timeout", 45000)
+            for deneme in range(4):
+                try:
+                    return _goto(url, **kw)
+                except Exception as e:
+                    msg = str(e)
+                    if "interrupted by another navigation" in msg and "chrome-error" not in msg:
+                        return None          # yonlendirme oldu, sayfa yine de acildi
+                    if deneme == 3:
+                        raise
+                    print(f"   sayfa acilamadi ({msg[:60]}...), 60 sn bekleyip tekrar deneniyor [{deneme + 1}/3]")
+                    time.sleep(60)
+        page.goto = guvenli_goto
         page.goto("https://www.instagram.com/")
         print("Instagram acildi. Acilan pencerede giris yapin; kod/dogrulama isterse tamamlayin.")
         if "--panel" in sys.argv:
@@ -163,7 +180,9 @@ def main(terms, links=()):
             "duckduckgo": lambda q, s: f"https://html.duckduckgo.com/html/?q={quote(q)}&s={s * 30}&kl=tr-tr",
             "google": lambda q, s: f"https://www.google.com/search?q={quote(q)}&start={s * 10}&hl=tr",
         }
-        hata_say = {m: 0 for m in MOTORLAR}
+        hata_say = {m: (0 if "--motorlar" in sys.argv else 99) for m in MOTORLAR}
+        if "--motorlar" not in sys.argv:
+            print("(Arama motorlari kapali - sadece Instagram aramasi kullaniliyor)")
         sayac = durum["sayac"]
 
         def motor_ara(q, sayfa):
@@ -217,7 +236,7 @@ def main(terms, links=()):
                     bos = bos + 1 if n == 0 else 0
                     if bos >= 2:
                         break
-        if all(v >= 3 for v in hata_say.values()):
+        if "--motorlar" in sys.argv and all(v >= 3 for v in hata_say.values()):
             print("!!! Hicbir arama motoruna baglanilamadi. Internet/VPN/antivirus baglantiyi kesiyor olabilir.")
         print(f"\n== Arama motorlari bitti: {len(found)} profil listede. Simdi Instagram aramasi, sonra profiller tek tek okunacak. ==\n")
 

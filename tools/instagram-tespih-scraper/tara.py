@@ -255,15 +255,27 @@ def main(terms, links=()):
 
             def ara():
                 page.goto("https://www.instagram.com/explore/", wait_until="domcontentloaded"); bekle(4, 6)
-                box = page.locator("input[placeholder='Ara'], input[placeholder='Search'], "
-                                   "input[aria-label*='Ara'], input[aria-label*='Search'], input[type='text']")
-                if not box.count():                      # kutu yoksa soldaki Ara ikonuna tikla
+                SEC = ("input[placeholder='Ara'], input[placeholder='Search'], "
+                       "input[aria-label*='Ara'], input[aria-label*='Search']")
+
+                def gorunen_kutu():
+                    loc = page.locator(SEC)
+                    for i in range(loc.count()):
+                        if loc.nth(i).is_visible():
+                            return loc.nth(i)
+                    return None
+
+                box = gorunen_kutu()
+                if box is None:                          # kutu gorunmuyorsa soldaki Ara ikonuna tikla
                     for name in ("Ara", "Search"):
-                        loc = page.get_by_role("link", name=name)
-                        if loc.count():
-                            loc.first.click(); bekle(1, 2); break
+                        l = page.get_by_role("link", name=name)
+                        if l.count():
+                            l.first.click(); bekle(2, 3); break
+                    box = gorunen_kutu()
+                if box is None:
+                    raise RuntimeError("gorunur arama kutusu bulunamadi")
                 onceki = set(linkler_ekranda())          # menu / alt bilgi linkleri: sayilmayacak
-                box.first.click(); box.first.fill(t)
+                box.click(timeout=5000); box.fill(t)
                 bekle(4, 6)
                 sonuc = []
 
@@ -303,7 +315,10 @@ def main(terms, links=()):
             except Exception as e:
                 print(f"   arama kutusu kullanilamadi: {str(e)[:100]}")
 
-            # 2) Anahtar kelime sayfasindaki gonderiler -> sahipleri
+            # 2) Anahtar kelime sayfasindaki gonderiler -> sahipleri (yavas; sadece --gonderiler ile)
+            if "--gonderiler" not in sys.argv:
+                durum["terim_done"].append(t); kaydet()
+                continue
             url = f"https://www.instagram.com/explore/search/keyword/?q={quote(t)}"
             print(f"[sayfa] {url}")
             posts = []
